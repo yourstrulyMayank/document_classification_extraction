@@ -21,12 +21,12 @@
 
         .settings-icon {
             position: fixed;
-            top: 20px;
+            bottom: 10px;
             left: 0;
-            background: linear-gradient(180deg, #4b6cb7 0%, #182848 100%);
+            background: #3f3d3dff;
             color: white;
-            width: 50px;
-            height: 50px;
+            width: 60px;
+            height: 60px;
             border-radius: 0 8px 8px 0;
             display: flex;
             align-items: center;
@@ -38,7 +38,7 @@
         }
 
         .settings-icon:hover {
-            transform: translateX(5px);
+            transform: translateX(1px);
             box-shadow: 2px 6px 20px rgba(75, 108, 183, 0.6);
         }
 
@@ -387,9 +387,10 @@
     </style>
 </head>
 <body>
+    
     <!-- Settings Icon -->
     <div class="settings-icon" id="settings-icon">
-        ⚙️
+        <h1>⚙️</h1>
     </div>
 
     <!-- Sidebar Overlay -->
@@ -428,11 +429,11 @@
     <div class="main-content">
         <!-- App Title -->
         <div class="app-title">
-            📄 DocClassifier
+            📄 Document Classification & Extraction
         </div>
 
         <div class="card">
-            <h2>Document Classification & Extraction</h2>
+            <h2>Upload Section</h2>
             <p style="color: #ffffffff; margin-bottom: 2rem;">
                 Upload a document (PDF or Image) to automatically classify and extract relevant information
             </p>
