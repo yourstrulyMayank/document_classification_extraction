@@ -3,12 +3,12 @@
 # =====================================
 
 # --- LLM Provider Settings ---
-MODEL_PROVIDER = "ollama"  # options: "huggingface", "ollama"
-MODEL_NAME = "llama3.2"  # e.g., "gemma-7b-it", "llama3:8b", "mistral-7b-instruct"
+MODEL_PROVIDER = "api"  # options: "huggingface", "ollama", "api"
+MODEL_NAME = "gemma3:4b"  # e.g., "gemma-7b-it", "llama3:8b", "mistral-7b-instruct"
 HF_LOCAL_PATH = "/path/to/huggingface/model"  # used if MODEL_PROVIDER = "huggingface"
 
 # --- OCR Settings ---
-OCR_ENGINE = "easyocr"  # options: "easyocr", "paddleocr", "tesseract", "gemini"
+OCR_ENGINE = "gemini"  # options: "easyocr", "paddleocr", "tesseract", "gemini"
 OCR_LANGUAGES = ['en']
 
 # --- Gemini API Settings ---
@@ -130,6 +130,13 @@ def query_model(prompt):
         except Exception as e:
             print(f"Ollama subprocess error: {e}")
             return ""
+    elif MODEL_PROVIDER == "api":
+        # Gemini API call
+        import google.generativeai as genai
+        genai.configure(api_key=GEMINI_API_KEY)
+        model = genai.GenerativeModel(GEMINI_MODEL)
+        response = model.generate_content(prompt)
+        return response.text.strip()
     else:
         raise ValueError(f"Unsupported MODEL_PROVIDER: {MODEL_PROVIDER}")
 
@@ -190,49 +197,7 @@ def extract_text_with_engine(image_path, ocr_engine):
         print(f"OCR error with {ocr_engine}: {e}")
         return ""
 
-def query_model_dynamic(prompt, llm_provider, model_name="llama3.2"):
-    """Query LLM with dynamic provider selection"""
-    print(f"Using LLM provider: {llm_provider}")
-    
-    if llm_provider == "huggingface":
-        try:
-            from transformers import pipeline
-            if os.path.exists(HF_LOCAL_PATH):
-                llm_pipe = pipeline("text-generation", model=HF_LOCAL_PATH, device_map="auto")
-            else:
-                llm_pipe = pipeline("text-generation", model=MODEL_NAME, device_map="auto")
-            
-            result = llm_pipe(prompt, max_new_tokens=512, do_sample=False)
-            generated_text = result[0]['generated_text']
-            if generated_text.startswith(prompt):
-                return generated_text[len(prompt):].strip()
-            return generated_text
-        except Exception as e:
-            print(f"HuggingFace error: {e}")
-            return ""
-            
-    elif llm_provider == "ollama":
-        try:
-            result = subprocess.run(
-                ["ollama", "run", model_name],
-                input=prompt,
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                timeout=60,
-                encoding='utf-8',
-                errors='ignore'
-            )
-            if result.returncode == 0:
-                return result.stdout.strip()
-            else:
-                print(f"Ollama error: {result.stderr}")
-                return ""
-        except Exception as e:
-            print(f"Ollama error: {e}")
-            return ""
-    else:
-        raise ValueError(f"Unsupported LLM provider: {llm_provider}")
+
         
 def extract_text_from_image(image_path):
     """Run OCR using the configured OCR engine."""
@@ -310,8 +275,7 @@ def classify_document(text):
 
 def extract_details(text, doc_type):
     prompt = f"""
-    You are an expert in document information extraction. Extract key information from this {doc_type} document and format it as a valid JSON object.
-    Only include fields that are actually present in the text.
+    Please summarize the key fields and values found in this document text. Return the result as a valid JSON object.
 
     Document text:
     {text[:2000]}
@@ -322,7 +286,7 @@ def extract_details(text, doc_type):
     JSON:"""
     
     raw_output = query_model(prompt).strip()
-    
+    print(f'raw_ouput: {raw_output}')
     try:
         # Try to find JSON in the response
         import re
@@ -369,6 +333,7 @@ def process_document():
             extracted_text = extract_text_from_image(file_path)
         
         print(f"Extracted text length: {len(extracted_text)}")  # Debug log
+        print(f"Extracted text: {extracted_text}")  # Debug log
         
         if not extracted_text or len(extracted_text.strip()) < 10:
             return jsonify({'error': 'Could not extract sufficient text from document'}), 400
