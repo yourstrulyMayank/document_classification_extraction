@@ -16,9 +16,29 @@
             background: #fdf6f0; /* warm white background */
             min-height: 100vh;
             display: flex;
+            flex-direction: column;
             position: relative;
         }
-
+        
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: left;
+            gap: 40px;
+            padding: 15px 30px;
+            background: #fdf6f0;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        
+        header img {
+            height: 75px;
+            transition: transform 0.3s ease;
+        }
+        
+        header img:hover {
+            transform: scale(1.05);
+        }
+        
         .settings-icon {
             position: fixed;
             bottom: 10px;
@@ -83,6 +103,12 @@
             background: rgba(255, 255, 255, 0.2);
             transform: scale(1.1);
         }
+        nav {
+            width: 100%;
+            text-align: left;
+            padding: 10px 20px;
+            background-color: #005bb5;
+        }
 
         .nav-item {
             color: rgba(255, 255, 255, 0.8);
@@ -106,7 +132,6 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
         }
 
         .app-title {
@@ -257,6 +282,83 @@
         .extraction-section {
             display: none;
             margin-top: 1rem;
+            width: 100%;
+            max-width: none;
+        }
+
+        .extraction-container {
+            display: flex;
+            gap: 2rem;
+            width: 100%;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .document-preview {
+            flex: 0 0 45%;
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            max-height: 80vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .document-preview h3 {
+            color: #333;
+            margin-bottom: 1rem;
+            font-size: 1.3rem;
+        }
+
+        .document-display {
+            flex: 1;
+            overflow: auto;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f9f9f9;
+        }
+
+        .document-display img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 4px;
+        }
+
+        .document-display iframe {
+            width: 100%;
+            height: 100%;
+            min-height: 500px;
+            border: none;
+            border-radius: 4px;
+        }
+
+        .results-panel {
+            flex: 0 0 55%;
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            max-height: 80vh;
+            overflow: auto;
+        }
+
+        .results-panel h3 {
+            color: #333;
+            margin-bottom: 1rem;
+            font-size: 1.3rem;
+        }
+
+        .sub-options {
+            margin-top: 10px;
+            margin-left: 15px;
+            padding-left: 10px;
+            border-left: 2px solid #ddd;
         }
 
         .details-table {
@@ -370,6 +472,31 @@
             display: block;
         }
 
+        .document-loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            padding: 2rem;
+        }
+
+        .document-loading .spinner {
+            margin-bottom: 1rem;
+        }
+
+        @media (max-width: 1200px) {
+            .extraction-container {
+                flex-direction: column;
+            }
+            
+            .document-preview,
+            .results-panel {
+                flex: 1 1 auto;
+                max-height: 60vh;
+            }
+        }
+
         @media (max-width: 768px) {
             .main-content {
                 padding: 1rem;
@@ -383,11 +510,36 @@
                 font-size: 2rem;
                 margin-bottom: 1.5rem;
             }
+            
+            header {
+                gap: 20px;
+            }
+            
+            header img {
+                height: 50px;
+            }
+            
+            .extraction-container {
+                gap: 1rem;
+            }
+            
+            .document-preview,
+            .results-panel {
+                padding: 1rem;
+            }
         }
     </style>
 </head>
 <body>
-    
+    <!-- Header with logos -->
+    <header>
+        <img src="/static/infosys.png" alt="Infosys Logo"> 
+        <div class="app-title">
+            📄 Document Classification & Extraction
+        </div>         
+        <img src="/static/ABCBank.png" alt="ABC Bank Logo">
+    </header>
+    <nav></nav>
     <!-- Settings Icon -->
     <div class="settings-icon" id="settings-icon">
         <h1>⚙️</h1>
@@ -403,20 +555,35 @@
                 <div class="selector-group">
                     <label class="selector-label">OCR Model</label>
                     <select id="ocr-selector" class="model-dropdown">
-                        <option value="gemini">Gemini</option>
+                        <option value="tesseract">Tesseract</option>
                         <option value="easyocr">EasyOCR</option>
                         <option value="paddleocr">PaddleOCR</option>
-                        <option value="tesseract">Tesseract</option>
+                        <option value="gemini">Gemini</option>
                     </select>
+                    <div id="ocr-gemini-options" class="sub-options" style="display: none;">
+                        <label class="selector-label">Gemini OCR Variant</label>
+                        <select id="ocr-gemini-variant" class="model-dropdown">
+                            <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                            <option value="gemini-1.5-flash-vision">Gemini 1.5 Flash Vision</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="selector-group">
                     <label class="selector-label">LLM Model</label>
                     <select id="llm-selector" class="model-dropdown">
-                        <option value="ollama">Ollama</option>
                         <option value="huggingface">HuggingFace</option>
-                        <option value="huggingface">API</option>
+                        <option value="ollama">Ollama</option>
+                        <option value="api">API (Gemini)</option>
                     </select>
+                    <div id="llm-gemini-options" class="sub-options" style="display: none;">
+                        <label class="selector-label">Gemini LLM Variant</label>
+                        <select id="llm-gemini-variant" class="model-dropdown">
+                            <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                            <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                        </select>
+                    </div>
                 </div>
+                <button id="submit-settings" class="btn" disabled>Apply Settings</button>
             </div>
         </div>
         
@@ -428,10 +595,8 @@
 
     <div class="main-content">
         <!-- App Title -->
-        <div class="app-title">
-            📄 Document Classification & Extraction
-        </div>
-
+        
+        
         <div class="card">
             <h2>Upload Section</h2>
             <p style="color: #ffffffff; margin-bottom: 2rem;">
@@ -472,27 +637,43 @@
                 <button id="extract-btn" class="btn btn-success">📋 Extract Details</button>
             </div>
 
-            <!-- Extraction Results -->
-            <div id="extraction-section" class="extraction-section">
-                <h3 style="margin-bottom: 1rem; color: #333;">Extracted Details</h3>
-                <table id="details-table" class="details-table">
-                    <thead>
-                        <tr>
-                            <th>Field</th>
-                            <th>Value</th>
-                        </tr>
-                    </thead>
-                    <tbody id="details-tbody">
-                        <!-- Details will be populated here -->
-                    </tbody>
-                </table>
-            </div>
-
             <!-- Clear Session -->
             <button id="clear-btn" class="btn clear-btn" style="display: none;">🗑️ Clear & Start Over</button>
 
             <!-- Alerts -->
             <div id="alert-container"></div>
+        </div>
+
+        <!-- Extraction Results with Document Preview -->
+        <div id="extraction-section" class="extraction-section">
+            <div class="extraction-container">
+                <!-- Document Preview Panel -->
+                <div class="document-preview">
+                    <h3>📄 Document Preview</h3>
+                    <div id="document-display" class="document-display">
+                        <div class="document-loading">
+                            <div class="spinner"></div>
+                            <p>Loading document preview...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Results Panel -->
+                <div class="results-panel">
+                    <h3>📋 Extracted Details</h3>
+                    <table id="details-table" class="details-table">
+                        <thead>
+                            <tr>
+                                <th>Field</th>
+                                <th>Value</th>
+                            </tr>
+                        </thead>
+                        <tbody id="details-tbody">
+                            <!-- Details will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -514,16 +695,25 @@
         const detailsTableBody = document.getElementById('details-tbody');
         const alertContainer = document.getElementById('alert-container');
         const uploadSection = document.getElementById('upload-section');
+        const documentDisplay = document.getElementById('document-display');
         
         // Sidebar elements
         const settingsIcon = document.getElementById('settings-icon');
         const sidebar = document.getElementById('sidebar');
         const closeIcon = document.getElementById('close-icon');
         const sidebarOverlay = document.getElementById('sidebar-overlay');
+        const submitSettingsBtn = document.getElementById('submit-settings');
+        const ocrGeminiOptions = document.getElementById('ocr-gemini-options');
+        const llmGeminiOptions = document.getElementById('llm-gemini-options');
         
-        let selectedOCR = 'gemini';
-        let selectedLLM = 'ollama';
+        // Initialize with default values from Python config
+        let selectedOCR = 'tesseract';  // Default from OCR_ENGINE
+        let selectedLLM = 'ollama';     // Default from MODEL_PROVIDER
+        let selectedOCRVariant = 'gemini-2.5-pro';  // Default from GEMINI_MODEL
+        let selectedLLMVariant = 'gemini-2.5-pro';  // Default from GEMINI_MODEL
+        let settingsChanged = false;
         let currentFile = null;
+        let currentFileURL = null;
 
         // Sidebar functionality
         function toggleSidebar() {
@@ -536,8 +726,27 @@
             sidebarOverlay.classList.remove('active');
         }
 
+        function markSettingsChanged() {
+            settingsChanged = true;
+            submitSettingsBtn.disabled = false;
+        }
+
         // Initialize event listeners
         function init() {
+            // Set default dropdown values
+            document.getElementById('ocr-selector').value = selectedOCR;
+            document.getElementById('llm-selector').value = selectedLLM;
+            document.getElementById('ocr-gemini-variant').value = selectedOCRVariant;
+            document.getElementById('llm-gemini-variant').value = selectedLLMVariant;
+
+            // Show/hide Gemini options based on initial values
+            if (selectedOCR === 'gemini') {
+                ocrGeminiOptions.style.display = 'block';
+            }
+            if (selectedLLM === 'api') {
+                llmGeminiOptions.style.display = 'block';
+            }
+
             // Sidebar events
             settingsIcon.addEventListener('click', toggleSidebar);
             closeIcon.addEventListener('click', closeSidebar);
@@ -554,14 +763,67 @@
                 uploadArea.classList.add('dragover');
             });
 
+            // OCR selector change
             document.getElementById('ocr-selector').addEventListener('change', (e) => {
                 selectedOCR = e.target.value;
+                ocrGeminiOptions.style.display = selectedOCR === 'gemini' ? 'block' : 'none';
+                markSettingsChanged();
                 console.log('OCR changed to:', selectedOCR);
             });
 
+            // LLM selector change
             document.getElementById('llm-selector').addEventListener('change', (e) => {
                 selectedLLM = e.target.value;
+                llmGeminiOptions.style.display = selectedLLM === 'api' ? 'block' : 'none';
+                markSettingsChanged();
                 console.log('LLM changed to:', selectedLLM);
+            });
+
+            // OCR Gemini variant change
+            document.getElementById('ocr-gemini-variant').addEventListener('change', (e) => {
+                selectedOCRVariant = e.target.value;
+                markSettingsChanged();
+                console.log('OCR Gemini variant changed to:', selectedOCRVariant);
+            });
+
+            // LLM Gemini variant change
+            document.getElementById('llm-gemini-variant').addEventListener('change', (e) => {
+                selectedLLMVariant = e.target.value;
+                markSettingsChanged();
+                console.log('LLM Gemini variant changed to:', selectedLLMVariant);
+            });
+
+            // Submit settings
+            submitSettingsBtn.addEventListener('click', async () => {
+                try {
+                    const settings = {
+                        ocr_engine: selectedOCR,
+                        llm_provider: selectedLLM,
+                        ocr_gemini_variant: selectedOCRVariant,
+                        llm_gemini_variant: selectedLLMVariant
+                    };
+
+                    const response = await fetch('/update_settings', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(settings)
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        settingsChanged = false;
+                        submitSettingsBtn.disabled = true;
+                        showAlert('Settings updated successfully!', 'success');
+                        closeSidebar();
+                    } else {
+                        showAlert(result.error || 'Failed to update settings', 'error');
+                    }
+                } catch (error) {
+                    showAlert('Failed to update settings: ' + error.message, 'error');
+                }
             });
 
             uploadArea.addEventListener('dragleave', (e) => {
@@ -611,6 +873,12 @@
             }
 
             currentFile = file;
+            
+            // Create URL for file preview
+            if (currentFileURL) {
+                URL.revokeObjectURL(currentFileURL);
+            }
+            currentFileURL = URL.createObjectURL(file);
             
             // Show file info
             fileName.textContent = file.name;
@@ -713,6 +981,7 @@
                 if (result.success) {
                     hideProcessing();
                     displayExtractedDetails(result.details, result.document_type);
+                    displayDocumentPreview();
                     extractionSection.style.display = 'block';
                     showAlert('Details extracted successfully!', 'success');
                 } else {
@@ -725,6 +994,36 @@
                 hideProcessing();
                 showAlert('Extraction failed: ' + error.message, 'error');
                 extractBtn.disabled = false;
+            }
+        }
+
+        // Display document preview
+        function displayDocumentPreview() {
+            if (!currentFile || !currentFileURL) {
+                documentDisplay.innerHTML = '<div class="document-loading"><p>No document to preview</p></div>';
+                return;
+            }
+
+            if (currentFile.type === 'application/pdf') {
+                // For PDF files
+                documentDisplay.innerHTML = `
+                    <iframe src="${currentFileURL}" 
+                            type="application/pdf"
+                            title="Document Preview">
+                        <p>Your browser doesn't support PDF preview. 
+                           <a href="${currentFileURL}" target="_blank">Click here to view the document</a>
+                        </p>
+                    </iframe>
+                `;
+            } else if (currentFile.type.startsWith('image/')) {
+                // For image files
+                documentDisplay.innerHTML = `
+                    <img src="${currentFileURL}" 
+                         alt="Document Preview" 
+                         style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                `;
+            } else {
+                documentDisplay.innerHTML = '<div class="document-loading"><p>Preview not available for this file type</p></div>';
             }
         }
 

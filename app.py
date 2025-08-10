@@ -13,7 +13,7 @@ OCR_LANGUAGES = ['en']
 
 # --- Gemini API Settings ---
 GEMINI_API_KEY = "AIzaSyC1UyxGaDx7j2caQz_F5XYy6-08rMYzJ8Q"  # or use env var
-GEMINI_MODEL = "gemini-2.5-pro"  # or "gemini-1.5-flash-vision"
+GEMINI_MODEL = "gemini-2.0-flash-lite"  # or "gemini-1.5-flash-vision"
 
 # --- Categories ---
 CATEGORIES = [
@@ -51,23 +51,7 @@ if MODEL_PROVIDER == "huggingface":
         llm_pipe = pipeline("text-generation", model=MODEL_NAME, device_map="auto")
 
 # OCR Init
-if OCR_ENGINE == "easyocr":
-    import easyocr
-    ocr_reader = easyocr.Reader(OCR_LANGUAGES)
 
-elif OCR_ENGINE == "paddleocr":
-    from paddleocr import PaddleOCR
-    ocr_reader = PaddleOCR(use_angle_cls=True, lang='en')
-
-elif OCR_ENGINE == "tesseract":
-    import pytesseract
-    from PIL import Image
-    pytesseract.pytesseract.tesseract_cmd = r"/usr/bin/tesseract"  # adjust path
-
-elif OCR_ENGINE == "gemini":
-    import google.generativeai as genai
-    genai.configure(api_key=GEMINI_API_KEY)
-    gemini_model = genai.GenerativeModel(GEMINI_MODEL)
 
 # =====================================
 # CORE HELPERS
@@ -201,6 +185,23 @@ def extract_text_with_engine(image_path, ocr_engine):
         
 def extract_text_from_image(image_path):
     """Run OCR using the configured OCR engine."""
+    if OCR_ENGINE == "easyocr":
+        import easyocr
+        ocr_reader = easyocr.Reader(OCR_LANGUAGES)
+
+    elif OCR_ENGINE == "paddleocr":
+        from paddleocr import PaddleOCR
+        ocr_reader = PaddleOCR(use_angle_cls=True, lang='en')
+
+    elif OCR_ENGINE == "tesseract":
+        import pytesseract
+        from PIL import Image
+        pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"  # adjust path
+
+    elif OCR_ENGINE == "gemini":
+        import google.generativeai as genai
+        genai.configure(api_key=GEMINI_API_KEY)
+        gemini_model = genai.GenerativeModel(GEMINI_MODEL)
     try:
         processed_path = preprocess_image(image_path)
         print(f"Processed image saved to: {processed_path}")
@@ -445,6 +446,29 @@ def upload_file():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-
+@app.route('/update_settings', methods=['POST'])
+def update_settings():
+    try:
+        global OCR_ENGINE, MODEL_PROVIDER, GEMINI_MODEL
+        
+        data = request.get_json()
+        
+        # Update global variables
+        OCR_ENGINE = data.get('ocr_engine', OCR_ENGINE)
+        MODEL_PROVIDER = data.get('llm_provider', MODEL_PROVIDER)
+        
+        # Update Gemini model based on which service is using it
+        if OCR_ENGINE == 'gemini':
+            GEMINI_MODEL = data.get('ocr_gemini_variant', GEMINI_MODEL)
+        elif MODEL_PROVIDER == 'api':
+            GEMINI_MODEL = data.get('llm_gemini_variant', GEMINI_MODEL)
+        
+        print(f"Settings updated - OCR: {OCR_ENGINE}, LLM: {MODEL_PROVIDER}, Gemini: {GEMINI_MODEL}")
+        
+        return jsonify({'success': True, 'message': 'Settings updated'})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
 if __name__ == "__main__":
     app.run(debug=True)
