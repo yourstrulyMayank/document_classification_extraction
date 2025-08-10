@@ -3,12 +3,12 @@
 # =====================================
 
 # --- LLM Provider Settings ---
-MODEL_PROVIDER = "api"  # options: "huggingface", "ollama", "api"
-MODEL_NAME = "gemma3:4b"  # e.g., "gemma-7b-it", "llama3:8b", "mistral-7b-instruct"
-HF_LOCAL_PATH = "/path/to/huggingface/model"  # used if MODEL_PROVIDER = "huggingface"
+MODEL_PROVIDER = "huggingface"  # options: "huggingface", "ollama", "api"
+MODEL_NAME = "google/gemma-3-1b-it"  # e.g., "gemma-7b-it", "llama3:8b", "mistral-7b-instruct"
+HF_LOCAL_PATH = r"/models/llm/gemma-3-1b-it"  # used if MODEL_PROVIDER = "huggingface"
 
 # --- OCR Settings ---
-OCR_ENGINE = "gemini"  # options: "easyocr", "paddleocr", "tesseract", "gemini"
+OCR_ENGINE = "easyocr"  # options: "easyocr", "paddleocr", "tesseract", "gemini"
 OCR_LANGUAGES = ['en']
 
 # --- Gemini API Settings ---
@@ -20,6 +20,7 @@ CATEGORIES = [
     "passport", "driving_license", "national_id",
     "w8_certificate", "w9_certificate", "home_loan_documents"
 ]
+
 
 # =====================================
 # IMPORTS & INIT
@@ -152,7 +153,7 @@ def extract_text_with_engine(image_path, ocr_engine):
 
         elif ocr_engine == "paddleocr":
             reader = get_ocr_reader(ocr_engine)
-            result = reader.ocr(processed_path, cls=True)
+            result = reader.predict(processed_path, cls=True)
             text = "\n".join([line[1][0] for page in result for line in page]).strip()
 
         elif ocr_engine == "tesseract":
@@ -191,7 +192,7 @@ def extract_text_from_image(image_path):
 
     elif OCR_ENGINE == "paddleocr":
         from paddleocr import PaddleOCR
-        ocr_reader = PaddleOCR(use_angle_cls=True, lang='en')
+        ocr_reader = PaddleOCR(use_textline_orientation=True, lang='en')
 
     elif OCR_ENGINE == "tesseract":
         import pytesseract
@@ -211,7 +212,7 @@ def extract_text_from_image(image_path):
             text = "\n".join(result).strip()
 
         elif OCR_ENGINE == "paddleocr":
-            result = ocr_reader.ocr(processed_path, cls=True)
+            result = ocr_reader.predict(processed_path)
             text = "\n".join([line[1][0] for page in result for line in page]).strip()
 
         elif OCR_ENGINE == "tesseract":
