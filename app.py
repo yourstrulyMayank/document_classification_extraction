@@ -3,17 +3,17 @@
 # =====================================
 
 # --- LLM Provider Settings ---
-MODEL_PROVIDER = "huggingface"  # options: "huggingface", "ollama", "api"
+MODEL_PROVIDER = "api"  # options: "huggingface", "ollama", "api"
 MODEL_NAME = "google/gemma-3-1b-it"  # e.g., "gemma-7b-it", "llama3:8b", "mistral-7b-instruct"
 HF_LOCAL_PATH = r"/models/llm/gemma-3-1b-it"  # used if MODEL_PROVIDER = "huggingface"
 
 # --- OCR Settings ---
-OCR_ENGINE = "easyocr"  # options: "easyocr", "paddleocr", "tesseract", "gemini"
+OCR_ENGINE = "gemini"  # options: "easyocr", "paddleocr", "tesseract", "gemini"
 OCR_LANGUAGES = ['en']
 
 # --- Gemini API Settings ---
 GEMINI_API_KEY = "AIzaSyC1UyxGaDx7j2caQz_F5XYy6-08rMYzJ8Q"  # or use env var
-GEMINI_MODEL = "gemini-2.0-flash-lite"  # or "gemini-1.5-flash-vision"
+GEMINI_MODEL = "gemini-2.5-pro"  # or "gemini-1.5-flash-vision"
 
 # --- Categories ---
 CATEGORIES = [
@@ -416,6 +416,16 @@ def clear_session():
 @app.route('/')
 def index():
     return render_template('index.html')
+
+# PII Detection and Masking page route
+@app.route('/pii')
+def pii_detection():
+    return render_template('pii.html')
+
+# Document Classification and Extraction page route
+@app.route('/classification')
+def document_classification():
+    return render_template('classification.html')
 
 @app.route('/upload', methods=['POST'])
 def upload_file():

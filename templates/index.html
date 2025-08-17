@@ -471,6 +471,121 @@
         .sidebar-overlay.active {
             display: block;
         }
+         .navigation-container {
+        display: flex;
+        gap: 3rem;
+        justify-content: center;
+        align-items: stretch;
+        width: 100%;
+        max-width: 1200px;
+        margin: 2rem auto;
+    }
+    
+    .navigation-card {
+        background: linear-gradient(180deg, #4b6cb7 0%, #182848 100%);
+        border-radius: 16px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        padding: 3rem 2rem;
+        width: 100%;
+        max-width: 500px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        color: white;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        min-height: 300px;
+    }
+    
+    .navigation-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+    }
+    
+    .card-icon {
+        font-size: 4rem;
+        margin-bottom: 1.5rem;
+        opacity: 0.9;
+    }
+    
+    .navigation-card h2 {
+        color: white;
+        margin-bottom: 1.5rem;
+        font-size: 1.8rem;
+        font-weight: 600;
+    }
+    
+    .navigation-card p {
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 1.1rem;
+        line-height: 1.6;
+        margin-bottom: 2rem;
+        flex-grow: 1;
+    }
+    
+    .card-footer {
+        margin-top: auto;
+    }
+    
+    .learn-more {
+        color: rgba(255, 255, 255, 0.9);
+        font-weight: 500;
+        font-size: 1rem;
+        text-decoration: underline;
+        text-underline-offset: 4px;
+    }
+    
+    @media (max-width: 900px) {
+        .navigation-container {
+            flex-direction: column;
+            gap: 2rem;
+            max-width: 500px;
+        }
+        
+        .navigation-card {
+            min-height: 250px;
+            padding: 2.5rem 2rem;
+        }
+        
+        .card-icon {
+            font-size: 3rem;
+        }
+        
+        .navigation-card h2 {
+            font-size: 1.6rem;
+        }
+        
+        .navigation-card p {
+            font-size: 1rem;
+        }
+    }
+    
+    @media (max-width: 600px) {
+        .navigation-container {
+            gap: 1.5rem;
+        }
+        
+        .navigation-card {
+            padding: 2rem 1.5rem;
+            min-height: 220px;
+        }
+        
+        .card-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .navigation-card h2 {
+            font-size: 1.4rem;
+            margin-bottom: 1rem;
+        }
+        
+        .navigation-card p {
+            font-size: 0.9rem;
+            margin-bottom: 1.5rem;
+        }
+    }
 
         .document-loading {
             display: flex;
@@ -496,6 +611,30 @@
                 max-height: 60vh;
             }
         }
+        .ripple-effect {
+        position: absolute;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.2);
+        transform: scale(0);
+        animation: ripple 0.6s ease-out;
+        pointer-events: none;
+    }
+    
+    @keyframes ripple {
+        0% {
+            transform: scale(0);
+            opacity: 1;
+        }
+        100% {
+            transform: scale(1);
+            opacity: 0;
+        }
+    }
+    
+    .navigation-card {
+        position: relative;
+        overflow: hidden;
+    }
 
         @media (max-width: 768px) {
             .main-content {
@@ -535,605 +674,104 @@
     <header>
         <img src="/static/infosys.png" alt="Infosys Logo"> 
         <div class="app-title">
-            📄 Document Classification & Extraction
+            Welcome to Document Processing Suite
         </div>         
         <img src="/static/ABCBank.png" alt="ABC Bank Logo">
     </header>
     <nav></nav>
-    <!-- Settings Icon -->
-    <div class="settings-icon" id="settings-icon">
-        <h1>⚙️</h1>
-    </div>
-
-    <!-- Sidebar Overlay -->
-    <div class="sidebar-overlay" id="sidebar-overlay"></div>
-    
-    <!-- Sidebar -->
-    <div class="sidebar" id="sidebar">
-        <div class="sidebar-content">
-            <div class="model-selector">
-                <div class="selector-group">
-                    <label class="selector-label">OCR Model</label>
-                    <select id="ocr-selector" class="model-dropdown">
-                        <option value="tesseract">Tesseract</option>
-                        <option value="easyocr">EasyOCR</option>
-                        <option value="paddleocr">PaddleOCR</option>
-                        <option value="gemini">Gemini</option>
-                    </select>
-                    <div id="ocr-gemini-options" class="sub-options" style="display: none;">
-                        <label class="selector-label">Gemini OCR Variant</label>
-                        <select id="ocr-gemini-variant" class="model-dropdown">
-                            <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-                            <option value="gemini-1.5-flash-vision">Gemini 1.5 Flash Vision</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="selector-group">
-                    <label class="selector-label">LLM Model</label>
-                    <select id="llm-selector" class="model-dropdown">
-                        <option value="huggingface">HuggingFace</option>
-                        <option value="ollama">Ollama</option>
-                        <option value="api">API (Gemini)</option>
-                    </select>
-                    <div id="llm-gemini-options" class="sub-options" style="display: none;">
-                        <label class="selector-label">Gemini LLM Variant</label>
-                        <select id="llm-gemini-variant" class="model-dropdown">
-                            <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-                            <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-                        </select>
-                    </div>
-                </div>
-                <button id="submit-settings" class="btn" disabled>Apply Settings</button>
-            </div>
-        </div>
-        
-        <!-- Close Icon -->
-        <div class="close-icon" id="close-icon">
-            ✕
-        </div>
-    </div>
-
     <div class="main-content">
-        <!-- App Title -->
-        
-        
-        <div class="card">
-            <h2>Upload Section</h2>
-            <p style="color: #ffffffff; margin-bottom: 2rem;">
-                Upload a document (PDF or Image) to automatically classify and extract relevant information
-            </p>
-
-            <!-- Upload Section -->
-            <div id="upload-section">
-                <div class="upload-area" id="upload-area">
-                    <div class="upload-icon">📁</div>
-                    <div class="upload-text">
-                        <strong>Click to upload</strong> or drag and drop<br>
-                        <small>PDF, PNG, JPG, JPEG files only (max 16MB)</small>
-                    </div>
-                </div>
-                <input type="file" id="file-input" class="file-input" accept=".pdf,.png,.jpg,.jpeg,.tiff,.bmp">
-                <button id="process-btn" class="btn" disabled>🔄 Process Document</button>
+    
+    
+    <!-- Navigation Cards Container -->
+    <div class="navigation-container">
+        <!-- PII Detection Card -->
+        <div class="navigation-card" onclick="navigateTo('pii.html')">
+            <div class="card-icon">🛡️</div>
+            <h2>PII Detection and Masking</h2>
+            <p>Automatically detect and mask personally identifiable information in documents to ensure privacy and compliance.</p>
+            <div class="card-footer">
+                <span class="learn-more">Click to proceed →</span>
             </div>
-
-            <!-- File Info -->
-            <div id="file-info" class="file-info">
-                <strong>Selected File:</strong> <span id="file-name"></span><br>
-                <strong>Size:</strong> <span id="file-size"></span>
-            </div>
-
-            <!-- Processing Section -->
-            <div id="processing" class="processing">
-                <div class="spinner"></div>
-                <div id="processing-text">Processing document...</div>
-            </div>
-
-            <!-- Classification Results -->
-            <div id="result-section" class="result-section">
-                <div class="classification-result">
-                    <div class="doc-type" id="doc-type">Document Type: Unknown</div>
-                    <div class="confidence" id="confidence">Confidence: Low</div>
-                </div>
-                <button id="extract-btn" class="btn btn-success">📋 Extract Details</button>
-            </div>
-
-            <!-- Clear Session -->
-            <button id="clear-btn" class="btn clear-btn" style="display: none;">🗑️ Clear & Start Over</button>
-
-            <!-- Alerts -->
-            <div id="alert-container"></div>
         </div>
-
-        <!-- Extraction Results with Document Preview -->
-        <div id="extraction-section" class="extraction-section">
-            <div class="extraction-container">
-                <!-- Document Preview Panel -->
-                <div class="document-preview">
-                    <h3>📄 Document Preview</h3>
-                    <div id="document-display" class="document-display">
-                        <div class="document-loading">
-                            <div class="spinner"></div>
-                            <p>Loading document preview...</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Results Panel -->
-                <div class="results-panel">
-                    <h3>📋 Extracted Details</h3>
-                    <table id="details-table" class="details-table">
-                        <thead>
-                            <tr>
-                                <th>Field</th>
-                                <th>Value</th>
-                            </tr>
-                        </thead>
-                        <tbody id="details-tbody">
-                            <!-- Details will be populated here -->
-                        </tbody>
-                    </table>
-                </div>
+        
+        <!-- Document Classification Card -->
+        <div class="navigation-card" onclick="navigateTo('classification.html')">
+            <div class="card-icon">📄</div>
+            <h2>Document Classification & Extraction</h2>
+            <p>Classify documents and extract key information using advanced AI models for streamlined processing.</p>
+            <div class="card-footer">
+                <span class="learn-more">Click to proceed →</span>
             </div>
         </div>
     </div>
-
-    <script>
-        const fileInput = document.getElementById('file-input');
-        const uploadArea = document.getElementById('upload-area');
-        const processBtn = document.getElementById('process-btn');
-        const extractBtn = document.getElementById('extract-btn');
-        const clearBtn = document.getElementById('clear-btn');
-        const processing = document.getElementById('processing');
-        const processingText = document.getElementById('processing-text');
-        const fileInfo = document.getElementById('file-info');
-        const fileName = document.getElementById('file-name');
-        const fileSize = document.getElementById('file-size');
-        const resultSection = document.getElementById('result-section');
-        const extractionSection = document.getElementById('extraction-section');
-        const docType = document.getElementById('doc-type');
-        const confidence = document.getElementById('confidence');
-        const detailsTableBody = document.getElementById('details-tbody');
-        const alertContainer = document.getElementById('alert-container');
-        const uploadSection = document.getElementById('upload-section');
-        const documentDisplay = document.getElementById('document-display');
-        
-        // Sidebar elements
-        const settingsIcon = document.getElementById('settings-icon');
-        const sidebar = document.getElementById('sidebar');
-        const closeIcon = document.getElementById('close-icon');
-        const sidebarOverlay = document.getElementById('sidebar-overlay');
-        const submitSettingsBtn = document.getElementById('submit-settings');
-        const ocrGeminiOptions = document.getElementById('ocr-gemini-options');
-        const llmGeminiOptions = document.getElementById('llm-gemini-options');
-        
-        // Initialize with default values from Python config
-        let selectedOCR = 'tesseract';  // Default from OCR_ENGINE
-        let selectedLLM = 'ollama';     // Default from MODEL_PROVIDER
-        let selectedOCRVariant = 'gemini-2.5-pro';  // Default from GEMINI_MODEL
-        let selectedLLMVariant = 'gemini-2.5-pro';  // Default from GEMINI_MODEL
-        let settingsChanged = false;
-        let currentFile = null;
-        let currentFileURL = null;
-
-        // Sidebar functionality
-        function toggleSidebar() {
-            sidebar.classList.toggle('open');
-            sidebarOverlay.classList.toggle('active');
-        }
-
-        function closeSidebar() {
-            sidebar.classList.remove('open');
-            sidebarOverlay.classList.remove('active');
-        }
-
-        function markSettingsChanged() {
-            settingsChanged = true;
-            submitSettingsBtn.disabled = false;
-        }
-
-        // Initialize event listeners
-        function init() {
-            // Set default dropdown values
-            document.getElementById('ocr-selector').value = selectedOCR;
-            document.getElementById('llm-selector').value = selectedLLM;
-            document.getElementById('ocr-gemini-variant').value = selectedOCRVariant;
-            document.getElementById('llm-gemini-variant').value = selectedLLMVariant;
-
-            // Show/hide Gemini options based on initial values
-            if (selectedOCR === 'gemini') {
-                ocrGeminiOptions.style.display = 'block';
-            }
-            if (selectedLLM === 'api') {
-                llmGeminiOptions.style.display = 'block';
-            }
-
-            // Sidebar events
-            settingsIcon.addEventListener('click', toggleSidebar);
-            closeIcon.addEventListener('click', closeSidebar);
-            sidebarOverlay.addEventListener('click', closeSidebar);
-
-            // Upload area click
-            uploadArea.addEventListener('click', () => {
-                fileInput.click();
-            });
-
-            // Drag and drop functionality
-            uploadArea.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                uploadArea.classList.add('dragover');
-            });
-
-            // OCR selector change
-            document.getElementById('ocr-selector').addEventListener('change', (e) => {
-                selectedOCR = e.target.value;
-                ocrGeminiOptions.style.display = selectedOCR === 'gemini' ? 'block' : 'none';
-                markSettingsChanged();
-                console.log('OCR changed to:', selectedOCR);
-            });
-
-            // LLM selector change
-            document.getElementById('llm-selector').addEventListener('change', (e) => {
-                selectedLLM = e.target.value;
-                llmGeminiOptions.style.display = selectedLLM === 'api' ? 'block' : 'none';
-                markSettingsChanged();
-                console.log('LLM changed to:', selectedLLM);
-            });
-
-            // OCR Gemini variant change
-            document.getElementById('ocr-gemini-variant').addEventListener('change', (e) => {
-                selectedOCRVariant = e.target.value;
-                markSettingsChanged();
-                console.log('OCR Gemini variant changed to:', selectedOCRVariant);
-            });
-
-            // LLM Gemini variant change
-            document.getElementById('llm-gemini-variant').addEventListener('change', (e) => {
-                selectedLLMVariant = e.target.value;
-                markSettingsChanged();
-                console.log('LLM Gemini variant changed to:', selectedLLMVariant);
-            });
-
-            // Submit settings
-            submitSettingsBtn.addEventListener('click', async () => {
-                try {
-                    const settings = {
-                        ocr_engine: selectedOCR,
-                        llm_provider: selectedLLM,
-                        ocr_gemini_variant: selectedOCRVariant,
-                        llm_gemini_variant: selectedLLMVariant
-                    };
-
-                    const response = await fetch('/update_settings', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify(settings)
-                    });
-
-                    const result = await response.json();
-
-                    if (result.success) {
-                        settingsChanged = false;
-                        submitSettingsBtn.disabled = true;
-                        showAlert('Settings updated successfully!', 'success');
-                        closeSidebar();
-                    } else {
-                        showAlert(result.error || 'Failed to update settings', 'error');
-                    }
-                } catch (error) {
-                    showAlert('Failed to update settings: ' + error.message, 'error');
-                }
-            });
-
-            uploadArea.addEventListener('dragleave', (e) => {
-                e.preventDefault();
-                uploadArea.classList.remove('dragover');
-            });
-
-            uploadArea.addEventListener('drop', (e) => {
-                e.preventDefault();
-                uploadArea.classList.remove('dragover');
-                const files = e.dataTransfer.files;
-                if (files.length > 0) {
-                    handleFile(files[0]);
-                }
-            });
-
-            // File input change
-            fileInput.addEventListener('change', (e) => {
-                if (e.target.files.length > 0) {
-                    handleFile(e.target.files[0]);
-                }
-            });
-
-            // Process button
-            processBtn.addEventListener('click', processDocument);
-
-            // Extract button
-            extractBtn.addEventListener('click', extractDetails);
-
-            // Clear button
-            clearBtn.addEventListener('click', clearSession);
-        }
-
-        // Handle file selection
-        function handleFile(file) {
-            // Validate file type
-            const allowedTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg', 'image/tiff', 'image/bmp'];
-            if (!allowedTypes.includes(file.type)) {
-                showAlert('Please select a valid file type (PDF, PNG, JPG, JPEG, TIFF, BMP)', 'error');
-                return;
-            }
-
-            // Validate file size (16MB)
-            if (file.size > 16 * 1024 * 1024) {
-                showAlert('File size must be less than 16MB', 'error');
-                return;
-            }
-
-            currentFile = file;
-            
-            // Create URL for file preview
-            if (currentFileURL) {
-                URL.revokeObjectURL(currentFileURL);
-            }
-            currentFileURL = URL.createObjectURL(file);
-            
-            // Show file info
-            fileName.textContent = file.name;
-            fileSize.textContent = formatFileSize(file.size);
-            fileInfo.style.display = 'block';
-            
-            // Enable process button
-            processBtn.disabled = false;
-            
-            // Upload file
-            uploadFile(file);
-        }
-
-        // Format file size
-        function formatFileSize(bytes) {
-            if (bytes === 0) return '0 Bytes';
-            const k = 1024;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-        }
-
-        // Upload file to server
-        async function uploadFile(file) {
-            try {
-                const formData = new FormData();
-                formData.append('file', file);
-
-                const response = await fetch('/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const result = await response.json();
-
-                if (result.success) {
-                    showAlert('File uploaded successfully!', 'success');
-                } else {
-                    showAlert(result.error || 'Upload failed', 'error');
-                    processBtn.disabled = true;
-                }
-            } catch (error) {
-                showAlert('Upload failed: ' + error.message, 'error');
-                processBtn.disabled = true;
-            }
-        }
-
-        // Process document
-        async function processDocument() {
-            try {
-                // Show processing state
-                showProcessing('Analyzing document...');
-                processBtn.disabled = true;
-                
-                // Hide previous results
-                resultSection.style.display = 'none';
-                extractionSection.style.display = 'none';
-
-                const response = await fetch('/process_document', {
-                    method: 'POST'
-                });
-
-                const result = await response.json();
-
-                if (result.success) {
-                    // Hide processing
-                    hideProcessing();
-                    
-                    // Show classification results
-                    docType.textContent = `Document Type: ${result.document_type}`;
-                    confidence.textContent = `Confidence: ${result.confidence}`;
-                    resultSection.style.display = 'block';
-                    clearBtn.style.display = 'inline-block';
-                    
-                    showAlert('Document classified successfully!', 'success');
-                } else {
-                    hideProcessing();
-                    showAlert(result.error || 'Processing failed', 'error');
-                    processBtn.disabled = false;
-                }
-            } catch (error) {
-                hideProcessing();
-                showAlert('Processing failed: ' + error.message, 'error');
-                processBtn.disabled = false;
-            }
-        }
-
-        // Extract details
-        async function extractDetails() {
-            try {
-                extractBtn.disabled = true;
-                showProcessing('Extracting details...');
-
-                const response = await fetch('/extract', {
-                    method: 'POST'
-                });
-
-                const result = await response.json();
-
-                if (result.success) {
-                    hideProcessing();
-                    displayExtractedDetails(result.details, result.document_type);
-                    displayDocumentPreview();
-                    extractionSection.style.display = 'block';
-                    showAlert('Details extracted successfully!', 'success');
-                } else {
-                    hideProcessing();
-                    showAlert(result.error || 'Extraction failed', 'error');
-                }
-                
-                extractBtn.disabled = false;
-            } catch (error) {
-                hideProcessing();
-                showAlert('Extraction failed: ' + error.message, 'error');
-                extractBtn.disabled = false;
-            }
-        }
-
-        // Display document preview
-        function displayDocumentPreview() {
-            if (!currentFile || !currentFileURL) {
-                documentDisplay.innerHTML = '<div class="document-loading"><p>No document to preview</p></div>';
-                return;
-            }
-
-            if (currentFile.type === 'application/pdf') {
-                // For PDF files
-                documentDisplay.innerHTML = `
-                    <iframe src="${currentFileURL}" 
-                            type="application/pdf"
-                            title="Document Preview">
-                        <p>Your browser doesn't support PDF preview. 
-                           <a href="${currentFileURL}" target="_blank">Click here to view the document</a>
-                        </p>
-                    </iframe>
-                `;
-            } else if (currentFile.type.startsWith('image/')) {
-                // For image files
-                documentDisplay.innerHTML = `
-                    <img src="${currentFileURL}" 
-                         alt="Document Preview" 
-                         style="max-width: 100%; max-height: 100%; object-fit: contain;">
-                `;
-            } else {
-                documentDisplay.innerHTML = '<div class="document-loading"><p>Preview not available for this file type</p></div>';
-            }
-        }
-
-        // Display extracted details in table
-        function displayExtractedDetails(details, documentType) {
-            // Clear existing details
-            detailsTableBody.innerHTML = '';
-
-            if (Object.keys(details).length === 0) {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td colspan="2" style="text-align: center; color: #666;">
-                        No specific details could be extracted from this ${documentType} document.
-                    </td>
-                `;
-                detailsTableBody.appendChild(row);
-                return;
-            }
-
-            // Add each detail as a row
-            Object.entries(details).forEach(([field, value]) => {
-                if (value && value.trim()) {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td><strong>${field}</strong></td>
-                        <td>${value}</td>
-                    `;
-                    detailsTableBody.appendChild(row);
-                }
-            });
-        }
-
-        // Clear session
-        async function clearSession() {
-            try {
-                const response = await fetch('/clear', {
-                    method: 'POST'
-                });
-
-                const result = await response.json();
-
-                if (result.success) {
-                    // Reset UI
-                    currentFile = null;
-                    fileInput.value = '';
-                    fileInfo.style.display = 'none';
-                    resultSection.style.display = 'none';
-                    extractionSection.style.display = 'none';
-                    processing.style.display = 'none';
-                    clearBtn.style.display = 'none';
-                    processBtn.disabled = true;
-                    extractBtn.disabled = false;
-                    
-                    // Clear alerts
-                    alertContainer.innerHTML = '';
-                    
-                    showAlert('Session cleared successfully!', 'success');
-                } else {
-                    showAlert(result.error || 'Failed to clear session', 'error');
-                }
-            } catch (error) {
-                showAlert('Failed to clear session: ' + error.message, 'error');
-            }
-        }
-
-        // Show processing state
-        function showProcessing(message) {
-            processingText.textContent = message;
-            processing.style.display = 'flex';
-            uploadSection.style.opacity = '0.6';
-        }
-
-        // Hide processing state
-        function hideProcessing() {
-            processing.style.display = 'none';
-            uploadSection.style.opacity = '1';
-        }
-
-        // Show alert
-        function showAlert(message, type) {
-            const alert = document.createElement('div');
-            alert.className = `alert alert-${type}`;
-            alert.textContent = message;
-            
-            // Clear existing alerts
-            alertContainer.innerHTML = '';
-            alertContainer.appendChild(alert);
-            
-            // Auto remove after 5 seconds
-            setTimeout(() => {
-                if (alert.parentNode) {
-                    alert.remove();
-                }
-            }, 5000);
-        }
-
-        // Navigation item highlighting (optional enhancement)
-        document.addEventListener('DOMContentLoaded', function() {
-            const navItems = document.querySelectorAll('.nav-item');
-            
-            navItems.forEach(item => {
-                item.addEventListener('click', function() {
-                    navItems.forEach(nav => nav.classList.remove('active'));
-                    this.classList.add('active');
-                });
-            });
-        });
-
-        // Initialize the app
-        init();
-    </script>
+</div>
 </body>
+<script>
+    function toggleSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.querySelector('.sidebar-overlay');
+        
+        sidebar.classList.toggle('open');
+        overlay.classList.toggle('active');
+    }
+    
+    function closeSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.querySelector('.sidebar-overlay');
+        
+        sidebar.classList.remove('open');
+        overlay.classList.remove('active');
+    }
+    
+    
+    
+    // Close sidebar when clicking outside on desktop
+    document.addEventListener('click', function(event) {
+        const sidebar = document.getElementById('sidebar');
+        const settingsIcon = document.querySelector('.settings-icon');
+        
+        if (!sidebar.contains(event.target) && !settingsIcon.contains(event.target)) {
+            closeSidebar();
+        }
+    });
+    
+    // Keyboard navigation
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            closeSidebar();
+        }
+    });
+    
+    // Add ripple effect on card click
+    document.querySelectorAll('.navigation-card').forEach(card => {
+        card.addEventListener('click', function(e) {
+            const ripple = document.createElement('div');
+            const rect = this.getBoundingClientRect();
+            const size = Math.max(rect.width, rect.height);
+            const x = e.clientX - rect.left - size / 2;
+            const y = e.clientY - rect.top - size / 2;
+            
+            ripple.style.width = ripple.style.height = size + 'px';
+            ripple.style.left = x + 'px';
+            ripple.style.top = y + 'px';
+            ripple.classList.add('ripple-effect');
+            
+            this.appendChild(ripple);
+            
+            setTimeout(() => {
+                ripple.remove();
+            }, 600);
+        });
+    });
+    function navigateTo(page) {
+        // Add a small delay for better UX
+        setTimeout(() => {
+            if (page === 'pii.html') {
+                window.location.href = '/pii';
+            } else if (page === 'classification.html') {
+                window.location.href = '/classification';
+            }
+        }, 200);
+    }
+</script>
 </html>
