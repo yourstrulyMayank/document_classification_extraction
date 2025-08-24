@@ -104,6 +104,29 @@
             transform: scale(1.1);
         }
 
+        nav {
+            width: 100%;
+            text-align: left;
+            padding: 10px 20px;
+            background-color: #005bb5;
+        }
+
+        .nav-item {
+            color: rgba(255, 255, 255, 0.8);
+            padding: 0.75rem 1rem;
+            margin: 0.5rem 0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+        }
+
+        .nav-item:hover, .nav-item.active {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border-left-color: #4CAF50;
+        }
+
         .main-content {
             flex: 1;
             padding: 2rem;
@@ -111,6 +134,7 @@
             flex-direction: column;
             align-items: center;
         }
+        
 
         .app-title {
             color: #182848;
@@ -587,6 +611,8 @@
 </head>
 <body>
     <!-- Header with logos -->
+    
+
     <header>
         <img src="/static/infosys.png" alt="Infosys Logo"> 
         <div class="app-title">
@@ -594,7 +620,9 @@
         </div>         
         <img src="/static/ABCBank.png" alt="ABC Bank Logo">
     </header>
-    
+    <nav>
+        
+    </nav>
     <!-- Settings Icon -->
     <div class="settings-icon" id="settings-icon">
         <h1>⚙️</h1>

@@ -8,7 +8,7 @@ MODEL_NAME = "google/gemma-3-1b-it"  # e.g., "gemma-7b-it", "llama3:8b", "mistra
 HF_LOCAL_PATH = r"/models/llm/gemma-3-1b-it"  # used if MODEL_PROVIDER = "huggingface"
 
 # --- OCR Settings ---
-OCR_ENGINE = "easyocr"  # options: "easyocr", "paddleocr", "tesseract", "gemini"
+OCR_ENGINE = "gemini"  # options: "easyocr", "paddleocr", "tesseract", "gemini"
 OCR_LANGUAGES = ['en']
 
 # --- Gemini API Settings ---
@@ -19,7 +19,7 @@ GEMINI_MODELS = {1: 'gemini-2.5-pro',
                  4: 'gemini-2.0-flash',
                  5: 'gemini-2.0-flash-lite',
                  6: 'gemini-2.0-flash-live-001'}
-GEMINI_MODEL = GEMINI_MODELS[6]  
+GEMINI_MODEL = GEMINI_MODELS[5]  
 
 
 # --- Categories ---
@@ -54,6 +54,7 @@ from pydantic import BaseModel
 # import whisper
 import librosa
 import soundfile as sf
+import PIL
 # from moviepy.editor import VideoFileClip
 import tempfile
 # LLM Init
@@ -418,18 +419,145 @@ def detect_file_type(file_path):
     
     return 'unknown'
 
+# def extract_text_with_coordinates(image_path, ocr_engine):
+#     """Extract text with bounding box coordinates using specified OCR engine"""
+#     try:
+#         processed_path = preprocess_image(image_path)
+        
+#         if ocr_engine == "easyocr":
+#             reader = get_ocr_reader(ocr_engine)
+#             result = reader.readtext(processed_path, detail=1)
+#             text_data = []
+#             full_text = ""
+#             for (bbox, text, confidence) in result:
+#                 if confidence > 0.5:  # Filter low confidence detections
+#                     x1, y1 = int(min([point[0] for point in bbox])), int(min([point[1] for point in bbox]))
+#                     x2, y2 = int(max([point[0] for point in bbox])), int(max([point[1] for point in bbox]))
+#                     text_data.append({
+#                         'text': text,
+#                         'bbox': [x1, y1, x2, y2],
+#                         'confidence': confidence
+#                     })
+#                     full_text += text + " "
+
+#         elif ocr_engine == "tesseract":
+#             import pytesseract
+#             from PIL import Image
+            
+#             with Image.open(processed_path) as img:  # Use context manager
+#                 data = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT)
+#             text_data = []
+#             full_text = ""
+            
+#             for i in range(len(data['text'])):
+#                 if int(data['conf'][i]) > 30:  # Filter low confidence
+#                     text = data['text'][i].strip()
+#                     if text:
+#                         x, y, w, h = data['left'][i], data['top'][i], data['width'][i], data['height'][i]
+#                         text_data.append({
+#                             'text': text,
+#                             'bbox': [x, y, x + w, y + h],
+#                             'confidence': data['conf'][i]
+#                         })
+#                         full_text += text + " "
+
+#         elif ocr_engine == "gemini":
+#             import google.generativeai as genai
+#             from google.genai.types import GenerateContentConfig, Part
+#             import PIL.Image
+            
+#             genai.configure(api_key=GEMINI_API_KEY)
+#             client = genai.Client()
+            
+#             # Define the schema for text with bounding boxes
+#             from pydantic import BaseModel
+            
+#             class TextWithBbox(BaseModel):
+#                 text: str
+#                 box_2d: list[int]  # [y_min, x_min, y_max, x_max] normalized to 1000
+#                 confidence: float = 1.0
+            
+#             config = GenerateContentConfig(
+#                 system_instruction="""
+#                 Extract all readable text from this document image with bounding box coordinates.
+#                 Return each text segment with its position as normalized coordinates (0-1000).
+#                 Format: [y_min, x_min, y_max, x_max] where coordinates are normalized to 1000.
+#                 Only include text that is clearly readable.
+#                 """,
+#                 temperature=0.1,
+#                 response_mime_type="application/json",
+#                 response_schema=list[TextWithBbox],
+#             )
+            
+#             with PIL.Image.open(processed_path) as img:
+#                 img_width, img_height = img.size
+                
+#                 response = client.models.generate_content(
+#                     model=GEMINI_MODEL,
+#                     contents=[
+#                         Part.from_bytes(
+#                             data=open(processed_path, 'rb').read(),
+#                             mime_type="image/jpeg"
+#                         ),
+#                         "Extract all text with bounding boxes from this document image."
+#                     ],
+#                     config=config
+#                 )
+                
+#                 text_data = []
+#                 full_text = ""
+                
+#                 if response.parsed:
+#                     for item in response.parsed:
+#                         # Convert normalized coordinates to pixel coordinates
+#                         y_min = int(item.box_2d[0] / 1000 * img_height)
+#                         x_min = int(item.box_2d[1] / 1000 * img_width)
+#                         y_max = int(item.box_2d[2] / 1000 * img_height)
+#                         x_max = int(item.box_2d[3] / 1000 * img_width)
+                        
+#                         text_data.append({
+#                             'text': item.text,
+#                             'bbox': [x_min, y_min, x_max, y_max],
+#                             'confidence': item.confidence
+#                         })
+#                         full_text += item.text + " "
+
+#         else:
+#             # For other OCR engines, fall back to text-only extraction
+#             text = extract_text_with_engine(image_path, ocr_engine)
+#             text_data = [{'text': text, 'bbox': None, 'confidence': 1.0}]
+#             full_text = text
+
+#         # Safe file deletion with retry
+#         if os.path.exists(processed_path):
+#             try:
+#                 import time
+#                 time.sleep(0.1)  # Brief delay
+#                 os.remove(processed_path)
+#             except PermissionError:
+#                 print(f"Warning: Could not delete temporary file {processed_path}")
+
+#         return full_text.strip(), text_data
+
+#     except Exception as e:
+#         print(f"OCR with coordinates error: {e}")
+#         return "", []
+# # 
+
+
 def extract_text_with_coordinates(image_path, ocr_engine):
     """Extract text with bounding box coordinates using specified OCR engine"""
     try:
         processed_path = preprocess_image(image_path)
         
         if ocr_engine == "easyocr":
+            # ... (EasyOCR code is fine) ...
             reader = get_ocr_reader(ocr_engine)
             result = reader.readtext(processed_path, detail=1)
             text_data = []
             full_text = ""
             for (bbox, text, confidence) in result:
-                if confidence > 0.5:  # Filter low confidence detections
+                if confidence > 0.3:
                     x1, y1 = int(min([point[0] for point in bbox])), int(min([point[1] for point in bbox]))
                     x2, y2 = int(max([point[0] for point in bbox])), int(max([point[1] for point in bbox]))
                     text_data.append({
@@ -438,18 +566,20 @@ def extract_text_with_coordinates(image_path, ocr_engine):
                         'confidence': confidence
                     })
                     full_text += text + " "
-
+            
         elif ocr_engine == "tesseract":
+            # ... (Tesseract code is fine) ...
             import pytesseract
             from PIL import Image
             
-            with Image.open(processed_path) as img:  # Use context manager
+            with Image.open(processed_path) as img:
                 data = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT)
+            
             text_data = []
             full_text = ""
             
             for i in range(len(data['text'])):
-                if int(data['conf'][i]) > 30:  # Filter low confidence
+                if int(data['conf'][i]) > 20:
                     text = data['text'][i].strip()
                     if text:
                         x, y, w, h = data['left'][i], data['top'][i], data['width'][i], data['height'][i]
@@ -462,76 +592,84 @@ def extract_text_with_coordinates(image_path, ocr_engine):
 
         elif ocr_engine == "gemini":
             import google.generativeai as genai
-            from google.genai.types import GenerateContentConfig, Part
+            from google.generativeai.types import GenerationConfig
             import PIL.Image
-            
+            from google.genai.types import (
+                GenerateContentConfig,
+                HarmBlockThreshold,
+                HarmCategory,
+                HttpOptions,
+                Part,
+                
+            )
             genai.configure(api_key=GEMINI_API_KEY)
-            client = genai.Client()
-            
-            # Define the schema for text with bounding boxes
-            from pydantic import BaseModel
-            
-            class TextWithBbox(BaseModel):
-                text: str
-                box_2d: list[int]  # [y_min, x_min, y_max, x_max] normalized to 1000
-                confidence: float = 1.0
-            
-            config = GenerateContentConfig(
-                system_instruction="""
-                Extract all readable text from this document image with bounding box coordinates.
-                Return each text segment with its position as normalized coordinates (0-1000).
-                Format: [y_min, x_min, y_max, x_max] where coordinates are normalized to 1000.
-                Only include text that is clearly readable.
-                """,
-                temperature=0.1,
+            # This is the key difference: use `GenerationConfig` for JSON output.
+            # `response_schema` is part of a different, more experimental API.
+            config = GenerationConfig(
                 response_mime_type="application/json",
-                response_schema=list[TextWithBbox],
             )
             
-            with PIL.Image.open(processed_path) as img:
-                img_width, img_height = img.size
-                
-                response = client.models.generate_content(
-                    model=GEMINI_MODEL,
-                    contents=[
-                        Part.from_bytes(
-                            data=open(processed_path, 'rb').read(),
-                            mime_type="image/jpeg"
-                        ),
-                        "Extract all text with bounding boxes from this document image."
-                    ],
-                    config=config
-                )
-                
-                text_data = []
-                full_text = ""
-                
-                if response.parsed:
-                    for item in response.parsed:
-                        # Convert normalized coordinates to pixel coordinates
-                        y_min = int(item.box_2d[0] / 1000 * img_height)
-                        x_min = int(item.box_2d[1] / 1000 * img_width)
-                        y_max = int(item.box_2d[2] / 1000 * img_height)
-                        x_max = int(item.box_2d[3] / 1000 * img_width)
+            prompt_parts = [
+                "Extract all readable text from this document image along with its bounding box coordinates. The coordinates should be in the format [y_min, x_min, y_max, x_max] and normalized to a scale of 0 to 1. For example, [0.1, 0.2, 0.3, 0.4]. Return the response as a single JSON array of objects, where each object has 'text', 'bbox_norm', and 'confidence' (always 1.0).",
+                PIL.Image.open(processed_path)
+            ]
+            
+            model = genai.GenerativeModel(GEMINI_MODEL)
+            
+            response = model.generate_content(
+                prompt_parts,
+                generation_config=config,
+            )
+
+            # --- Parse the JSON response ---
+            text_data = []
+            full_text = ""
+
+            try:
+                # The response.text will be the JSON string
+                if response.text:
+                    parsed_json = json.loads(response.text)
+                    if isinstance(parsed_json, list):
+                        img = PIL.Image.open(processed_path)
+                        img_width, img_height = img.size
                         
-                        text_data.append({
-                            'text': item.text,
-                            'bbox': [x_min, y_min, x_max, y_max],
-                            'confidence': item.confidence
-                        })
-                        full_text += item.text + " "
+                        for item in parsed_json:
+                            # Convert normalized coordinates back to pixel coordinates
+                            y_min_norm, x_min_norm, y_max_norm, x_max_norm = item['bbox_norm']
+                            x_min = int(x_min_norm * img_width)
+                            y_min = int(y_min_norm * img_height)
+                            x_max = int(x_max_norm * img_width)
+                            y_max = int(y_max_norm * img_height)
+                            
+                            text_data.append({
+                                'text': item['text'],
+                                'bbox': [x_min, y_min, x_max, y_max],
+                                'confidence': 1.0  # Gemini doesn't provide confidence scores, so we use a default.
+                            })
+                            full_text += item['text'] + " "
+                    else:
+                        print("Debug: Gemini response was not a JSON list.")
+                        # Fallback to text-only extraction
+                        full_text = query_model(["Extract all readable text from this document image:", PIL.Image.open(processed_path)]).strip()
+                        text_data = [{'text': full_text, 'bbox': None, 'confidence': 1.0}]
+                else:
+                    print("Debug: No text in Gemini response.")
+                    full_text = ""
+                    text_data = []
+            except json.JSONDecodeError as e:
+                print(f"JSON decode error with Gemini response: {e}")
+                print(f"Raw response: {response.text}")
+                full_text = query_model(["Extract all readable text from this document image:", PIL.Image.open(processed_path)]).strip()
+                text_data = [{'text': full_text, 'bbox': None, 'confidence': 1.0}]
 
         else:
-            # For other OCR engines, fall back to text-only extraction
-            text = extract_text_with_engine(image_path, ocr_engine)
-            text_data = [{'text': text, 'bbox': None, 'confidence': 1.0}]
-            full_text = text
+            raise ValueError(f"Unsupported OCR engine: {ocr_engine}")
 
         # Safe file deletion with retry
         if os.path.exists(processed_path):
             try:
                 import time
-                time.sleep(0.1)  # Brief delay
+                time.sleep(0.1)
                 os.remove(processed_path)
             except PermissionError:
                 print(f"Warning: Could not delete temporary file {processed_path}")
@@ -540,8 +678,9 @@ def extract_text_with_coordinates(image_path, ocr_engine):
 
     except Exception as e:
         print(f"OCR with coordinates error: {e}")
+        import traceback
+        traceback.print_exc()
         return "", []
-
 
 def transcribe_audio(file_path):
     """Transcribe audio file using Whisper"""
@@ -677,6 +816,113 @@ def create_redacted_text(original_text, pii_entities):
     
     return redacted_text
 
+# def create_redacted_image_with_coordinates(image_path, text_data, pii_entities):
+#     """Create redacted image with precise coordinate mapping and save temporarily"""
+#     try:
+#         img = cv2.imread(image_path)
+#         if img is None:
+#             return None, []
+        
+#         img_copy = img.copy()
+#         redaction_areas = []
+        
+#         print(f"Debug: Processing {len(pii_entities)} PII entities")
+#         print(f"Debug: Available text blocks: {len(text_data)}")
+        
+#         # For each detected PII entity
+#         for i, pii in enumerate(pii_entities):
+#             pii_text = pii['text'].strip()
+#             print(f"Debug: Looking for PII #{i+1}: '{pii_text}'")
+            
+#             found_match = False
+            
+#             # Find matching text blocks with coordinates
+#             for j, text_block in enumerate(text_data):
+#                 if text_block['bbox'] is None:
+#                     continue
+                    
+#                 block_text = text_block['text'].strip()
+#                 print(f"Debug: Checking against block #{j}: '{block_text}'")
+                
+#                 # Try different matching strategies
+#                 # Strategy 1: Exact match (case insensitive)
+#                 if pii_text.lower() in block_text.lower():
+#                     x1, y1, x2, y2 = text_block['bbox']
+#                     print(f"Debug: Found match in block #{j}, coordinates: ({x1}, {y1}, {x2}, {y2})")
+                    
+#                     # For now, redact the entire text block
+#                     # You can add more precise sub-block redaction later
+#                     cv2.rectangle(img_copy, (x1, y1), (x2, y2), (0, 0, 0), -1)
+                    
+#                     # Store redaction area for hover functionality
+#                     img_height, img_width = img.shape[:2]
+#                     redaction_areas.append({
+#                         'x_percent': (x1 / img_width) * 100,
+#                         'y_percent': (y1 / img_height) * 100,
+#                         'width_percent': ((x2 - x1) / img_width) * 100,
+#                         'height_percent': ((y2 - y1) / img_height) * 100,
+#                         'pii_type': pii['type'],
+#                         'pii_text': pii['text'],
+#                         'redaction': pii['redaction']
+#                     })
+                    
+#                     found_match = True
+#                     print(f"Debug: Successfully redacted PII #{i+1}")
+#                     break
+                
+#                 # Strategy 2: Fuzzy matching for partial words
+#                 # Clean and normalize both texts for comparison
+#                 clean_pii = ''.join(char.lower() for char in pii_text if char.isalnum())
+#                 clean_block = ''.join(char.lower() for char in block_text if char.isalnum())
+                
+#                 if clean_pii and clean_pii in clean_block:
+#                     x1, y1, x2, y2 = text_block['bbox']
+#                     print(f"Debug: Found fuzzy match in block #{j}, coordinates: ({x1}, {y1}, {x2}, {y2})")
+                    
+#                     cv2.rectangle(img_copy, (x1, y1), (x2, y2), (0, 0, 0), -1)
+                    
+#                     img_height, img_width = img.shape[:2]
+#                     redaction_areas.append({
+#                         'x_percent': (x1 / img_width) * 100,
+#                         'y_percent': (y1 / img_height) * 100,
+#                         'width_percent': ((x2 - x1) / img_width) * 100,
+#                         'height_percent': ((y2 - y1) / img_height) * 100,
+#                         'pii_type': pii['type'],
+#                         'pii_text': pii['text'],
+#                         'redaction': pii['redaction']
+#                     })
+                    
+#                     found_match = True
+#                     print(f"Debug: Successfully redacted PII #{i+1} using fuzzy match")
+#                     break
+            
+#             if not found_match:
+#                 print(f"Debug: No match found for PII #{i+1}: '{pii_text}'")
+#                 # Let's also print available text for debugging
+#                 print("Debug: Available text blocks:")
+#                 for k, text_block in enumerate(text_data[:5]):  # Show first 5 blocks
+#                     print(f"  Block #{k}: '{text_block['text'][:50]}...'")
+        
+#         # Save redacted image temporarily with unique name
+#         import uuid
+#         temp_filename = f"redacted_{uuid.uuid4().hex[:8]}.png"
+#         redacted_path = os.path.join(app.config['UPLOAD_FOLDER'], temp_filename)
+#         cv2.imwrite(redacted_path, img_copy)
+        
+#         # Store in session for cleanup
+#         if 'temp_files' not in session:
+#             session['temp_files'] = []
+#         session['temp_files'].append(redacted_path)
+        
+#         print(f"Debug: Created redacted image with {len(redaction_areas)} redacted areas")
+#         return redacted_path, redaction_areas
+        
+#     except Exception as e:
+#         print(f"Image redaction error: {e}")
+#         import traceback
+#         traceback.print_exc()
+#         return None, []
+
 def create_redacted_image_with_coordinates(image_path, text_data, pii_entities):
     """Create redacted image with precise coordinate mapping and save temporarily"""
     try:
@@ -686,52 +932,90 @@ def create_redacted_image_with_coordinates(image_path, text_data, pii_entities):
         
         img_copy = img.copy()
         redaction_areas = []
-        tolerance = 0.15
+        
+        print(f"Debug: Processing {len(pii_entities)} PII entities")
+        print(f"Debug: Available text blocks: {len(text_data)}")
         
         # For each detected PII entity
-        for pii in pii_entities:
-            pii_text = pii['text'].lower().strip()
+        for i, pii in enumerate(pii_entities):
+            pii_text = pii['text'].strip()
+            print(f"Debug: Looking for PII #{i+1}: '{pii_text}'")
+            
+            found_match = False
             
             # Find matching text blocks with coordinates
-            for text_block in text_data:
-                if text_block['bbox'] and pii_text in text_block['text'].lower():
-                    x1, y1, x2, y2 = text_block['bbox']
-                    block_text = text_block['text']
+            for j, text_block in enumerate(text_data):
+                if text_block['bbox'] is None:
+                    print(f"Debug: Block #{j} has no coordinates (OCR engine doesn't support coordinates)")
+                    continue
                     
-                    # Find the PII text within the block
-                    pii_start = block_text.lower().find(pii_text)
-                    if pii_start != -1:
-                        pii_end = pii_start + len(pii_text)
-                        
-                        # Calculate proportional coordinates within the text block
-                        text_length = len(block_text)
-                        start_fraction = pii_start / text_length if text_length > 0 else 0
-                        end_fraction = pii_end / text_length if text_length > 0 else 1
-                        
-                        # Calculate pixel coordinates with tolerance
-                        block_width = x2 - x1
-                        entity_start_x = int(x1 + block_width * start_fraction)
-                        entity_end_x = int(x1 + block_width * end_fraction)
-                        
-                        # Apply tolerance
-                        tolerance_pixels = int(block_width * tolerance)
-                        entity_start_x = max(x1, entity_start_x - tolerance_pixels)
-                        entity_end_x = min(x2, entity_end_x + tolerance_pixels)
-                        
-                        # Draw black rectangle over the PII text
-                        cv2.rectangle(img_copy, (entity_start_x, y1), (entity_end_x, y2), (0, 0, 0), -1)
-                        
-                        # Store redaction area for hover functionality (as percentages of image size)
-                        img_height, img_width = img.shape[:2]
-                        redaction_areas.append({
-                            'x_percent': (entity_start_x / img_width) * 100,
-                            'y_percent': (y1 / img_height) * 100,
-                            'width_percent': ((entity_end_x - entity_start_x) / img_width) * 100,
-                            'height_percent': ((y2 - y1) / img_height) * 100,
-                            'pii_type': pii['type'],
-                            'pii_text': pii['text'],
-                            'redaction': pii['redaction']
-                        })
+                block_text = text_block['text'].strip()
+                print(f"Debug: Checking against block #{j}: '{block_text}'")
+                
+                # Try different matching strategies
+                # Strategy 1: Exact match (case insensitive)
+                if pii_text.lower() in block_text.lower():
+                    x1, y1, x2, y2 = text_block['bbox']
+                    print(f"Debug: Found match in block #{j}, coordinates: ({x1}, {y1}, {x2}, {y2})")
+                    
+                    # For now, redact the entire text block
+                    # You can add more precise sub-block redaction later
+                    cv2.rectangle(img_copy, (x1, y1), (x2, y2), (0, 0, 0), -1)
+                    
+                    # Store redaction area for hover functionality
+                    img_height, img_width = img.shape[:2]
+                    redaction_areas.append({
+                        'x_percent': (x1 / img_width) * 100,
+                        'y_percent': (y1 / img_height) * 100,
+                        'width_percent': ((x2 - x1) / img_width) * 100,
+                        'height_percent': ((y2 - y1) / img_height) * 100,
+                        'pii_type': pii['type'],
+                        'pii_text': pii['text'],
+                        'redaction': pii['redaction']
+                    })
+                    
+                    found_match = True
+                    print(f"Debug: Successfully redacted PII #{i+1}")
+                    break
+                
+                # Strategy 2: Fuzzy matching for partial words
+                # Clean and normalize both texts for comparison
+                clean_pii = ''.join(char.lower() for char in pii_text if char.isalnum())
+                clean_block = ''.join(char.lower() for char in block_text if char.isalnum())
+                
+                if clean_pii and clean_pii in clean_block:
+                    x1, y1, x2, y2 = text_block['bbox']
+                    print(f"Debug: Found fuzzy match in block #{j}, coordinates: ({x1}, {y1}, {x2}, {y2})")
+                    
+                    cv2.rectangle(img_copy, (x1, y1), (x2, y2), (0, 0, 0), -1)
+                    
+                    img_height, img_width = img.shape[:2]
+                    redaction_areas.append({
+                        'x_percent': (x1 / img_width) * 100,
+                        'y_percent': (y1 / img_height) * 100,
+                        'width_percent': ((x2 - x1) / img_width) * 100,
+                        'height_percent': ((y2 - y1) / img_height) * 100,
+                        'pii_type': pii['type'],
+                        'pii_text': pii['text'],
+                        'redaction': pii['redaction']
+                    })
+                    
+                    found_match = True
+                    print(f"Debug: Successfully redacted PII #{i+1} using fuzzy match")
+                    break
+            
+            if not found_match:
+                print(f"Debug: No match found for PII #{i+1}: '{pii_text}'")
+                # Check if we have any blocks with coordinates
+                blocks_with_coords = [t for t in text_data if t['bbox'] is not None]
+                if not blocks_with_coords:
+                    print("Debug: No text blocks have coordinates - OCR engine may not support coordinate extraction")
+                else:
+                    # Let's also print available text for debugging
+                    print("Debug: Available text blocks:")
+                    for k, text_block in enumerate(text_data[:5]):  # Show first 5 blocks
+                        coord_info = f" at {text_block['bbox']}" if text_block['bbox'] else " (no coords)"
+                        print(f"  Block #{k}: '{text_block['text'][:50]}...'{coord_info}")
         
         # Save redacted image temporarily with unique name
         import uuid
@@ -744,12 +1028,14 @@ def create_redacted_image_with_coordinates(image_path, text_data, pii_entities):
             session['temp_files'] = []
         session['temp_files'].append(redacted_path)
         
+        print(f"Debug: Created redacted image with {len(redaction_areas)} redacted areas")
         return redacted_path, redaction_areas
         
     except Exception as e:
         print(f"Image redaction error: {e}")
+        import traceback
+        traceback.print_exc()
         return None, []
-
 # =====================================
 # FLASK APP
 # =====================================
