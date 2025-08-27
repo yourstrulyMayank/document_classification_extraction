@@ -109,6 +109,9 @@
             text-align: left;
             padding: 10px 20px;
             background-color: #005bb5;
+            display: flex;
+            align-items: center;
+            gap: 20px;
         }
 
         .nav-item {
@@ -133,6 +136,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+            justify-content: flex-start;
         }
         
 
@@ -149,10 +153,19 @@
             border-radius: 16px;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
             padding: 2rem;
-            width: 100%;
-            max-width: 600px;
+            width: 600px;              /* Initial width */
+            max-width: 90vw;
+            min-width: 320px;
             text-align: center;
-            transition: transform 0.3s ease;
+            transition: width 0.4s cubic-bezier(.4,2,.6,1), max-width 0.4s cubic-bezier(.4,2,.6,1);
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .card.expanded {
+            width: 80vw;               /* Expanded width */
+            max-width: 1400px;
         }
 
         .card:hover {
@@ -166,14 +179,18 @@
         }
 
         .upload-area {
-            border: 2px dashed #ddd;
-            border-radius: 12px;
-            padding: 3rem 2rem;
-            margin: 2rem 0;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            background: #f8f9fa;
-        }
+        border: 2px dashed #ddd;
+        border-radius: 12px;
+        padding: 3rem 2rem;
+        margin: 2rem 0;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        background: #f8f9fa;
+        max-width: 600px;
+        width: 100%;
+        margin-left: auto;
+        margin-right: auto;
+    }
 
         .upload-area:hover {
             border-color: #667eea;
@@ -198,6 +215,25 @@
 
         .file-input {
             display: none;
+        }
+        .back-btn {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+            display: none;
+        }
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateX(-2px);
+        }
+
+        .back-btn.show {
+            display: inline-block;
         }
 
         .btn {
@@ -235,14 +271,13 @@
         }
 
         .btn-small {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #005bb5;
             color: white;
             border: none;
             padding: 0.5rem 1rem;
             border-radius: 6px;
             cursor: pointer;
-            font-size: 0.9rem;
-            margin: 0.25rem;
+            font-size: 1rem;            
             transition: all 0.3s ease;
         }
 
@@ -390,8 +425,12 @@
             background: #f8f9fa;
             padding: 2rem;
             border-radius: 12px;
-            margin: 1rem 0;
+            margin: 1rem auto;
             text-align: left;
+            width: 80vw;
+            max-width: 1200px;
+            min-width: 320px;
+            align-self: center;       /* Center inside .card */
         }
 
         .pii-selection h3 {
@@ -400,11 +439,11 @@
         }
 
         .pii-categories {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1rem;
-            margin-bottom: 1rem;
-        }
+                display: grid;
+                grid-template-columns: repeat(3, 1fr); /* 3 columns */
+                gap: 1rem;
+                margin-bottom: 1rem;
+            }
 
         .pii-category {
             background: white;
@@ -424,7 +463,7 @@
         .pii-entity {
             display: flex;
             align-items: center;
-            margin: 0.5rem 0;
+            gap: 0.5rem;
         }
 
         .pii-entity input[type="checkbox"] {
@@ -604,7 +643,13 @@
             }
 
             .pii-categories {
-                grid-template-columns: 1fr;
+                display: grid;
+                grid-template-columns: repeat(3, 1fr); /* 3 columns */
+                gap: 1rem;
+                margin-bottom: 1rem;
+            }
+
+            
             }
         }
     </style>
@@ -621,7 +666,7 @@
         <img src="/static/ABCBank.png" alt="ABC Bank Logo">
     </header>
     <nav>
-        
+        <button onclick="window.history.back()" class="btn-small">⬅ Back</button>
     </nav>
     <!-- Settings Icon -->
     <div class="settings-icon" id="settings-icon">
@@ -647,7 +692,10 @@
                         <label class="selector-label">Gemini OCR Variant</label>
                         <select id="ocr-gemini-variant" class="model-dropdown">
                             <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-                            <option value="gemini-1.5-flash-vision">Gemini 1.5 Flash Vision</option>
+                            <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                            <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</option>
+                            <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                            <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite</option>
                         </select>
                     </div>
                 </div>
@@ -662,7 +710,10 @@
                         <label class="selector-label">Gemini LLM Variant</label>
                         <select id="llm-gemini-variant" class="model-dropdown">
                             <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-                            <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                            <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                            <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</option>
+                            <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                            <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite</option>
                         </select>
                     </div>
                 </div>
@@ -983,6 +1034,10 @@
             
             // Show PII selection
             piiSelection.style.display = 'block';
+
+            // Expand the blue card
+            document.querySelector('.card').classList.add('expanded');
+        
             
             // Enable process button if entities are selected
             updateProcessButton();
@@ -1323,7 +1378,8 @@
             // Clear selections
             selectNoneEntities();
             customEntitiesInput.value = '';
-            
+            document.querySelector('.card').classList.remove('expanded');
+        // ...existing code...
             // Clear alerts
             alertContainer.innerHTML = '';
         }

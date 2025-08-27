@@ -1,0 +1,9 @@
+{
+   "PAN Number": {
+     "description": "Indian Permanent Account Number in the format ABCDE1234F"
+   },
+   "Passport Number": {
+     "description": "Indian Passport Number typically 8 characters long starting with a capital letter"
+   }
+ }
+ 

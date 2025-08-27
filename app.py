@@ -57,6 +57,10 @@ import soundfile as sf
 import PIL
 # from moviepy.editor import VideoFileClip
 import tempfile
+from common_functions import (
+    get_gliner_model, get_spacy_model, reader,
+    identify_pii, redact_pii, draw_black_rectangles
+)
 # LLM Init
 if MODEL_PROVIDER == "huggingface":
     from transformers import pipeline
@@ -65,6 +69,8 @@ if MODEL_PROVIDER == "huggingface":
     else:
         llm_pipe = pipeline("text-generation", model=MODEL_NAME, device_map="auto")
 
+gliner_model = get_gliner_model()
+spacy_model = get_spacy_model()
 # OCR Init
 
 
@@ -419,130 +425,7 @@ def detect_file_type(file_path):
     
     return 'unknown'
 
-# def extract_text_with_coordinates(image_path, ocr_engine):
-#     """Extract text with bounding box coordinates using specified OCR engine"""
-#     try:
-#         processed_path = preprocess_image(image_path)
-        
-#         if ocr_engine == "easyocr":
-#             reader = get_ocr_reader(ocr_engine)
-#             result = reader.readtext(processed_path, detail=1)
-#             text_data = []
-#             full_text = ""
-#             for (bbox, text, confidence) in result:
-#                 if confidence > 0.5:  # Filter low confidence detections
-#                     x1, y1 = int(min([point[0] for point in bbox])), int(min([point[1] for point in bbox]))
-#                     x2, y2 = int(max([point[0] for point in bbox])), int(max([point[1] for point in bbox]))
-#                     text_data.append({
-#                         'text': text,
-#                         'bbox': [x1, y1, x2, y2],
-#                         'confidence': confidence
-#                     })
-#                     full_text += text + " "
 
-#         elif ocr_engine == "tesseract":
-#             import pytesseract
-#             from PIL import Image
-            
-#             with Image.open(processed_path) as img:  # Use context manager
-#                 data = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT)
-#             text_data = []
-#             full_text = ""
-            
-#             for i in range(len(data['text'])):
-#                 if int(data['conf'][i]) > 30:  # Filter low confidence
-#                     text = data['text'][i].strip()
-#                     if text:
-#                         x, y, w, h = data['left'][i], data['top'][i], data['width'][i], data['height'][i]
-#                         text_data.append({
-#                             'text': text,
-#                             'bbox': [x, y, x + w, y + h],
-#                             'confidence': data['conf'][i]
-#                         })
-#                         full_text += text + " "
-
-#         elif ocr_engine == "gemini":
-#             import google.generativeai as genai
-#             from google.genai.types import GenerateContentConfig, Part
-#             import PIL.Image
-            
-#             genai.configure(api_key=GEMINI_API_KEY)
-#             client = genai.Client()
-            
-#             # Define the schema for text with bounding boxes
-#             from pydantic import BaseModel
-            
-#             class TextWithBbox(BaseModel):
-#                 text: str
-#                 box_2d: list[int]  # [y_min, x_min, y_max, x_max] normalized to 1000
-#                 confidence: float = 1.0
-            
-#             config = GenerateContentConfig(
-#                 system_instruction="""
-#                 Extract all readable text from this document image with bounding box coordinates.
-#                 Return each text segment with its position as normalized coordinates (0-1000).
-#                 Format: [y_min, x_min, y_max, x_max] where coordinates are normalized to 1000.
-#                 Only include text that is clearly readable.
-#                 """,
-#                 temperature=0.1,
-#                 response_mime_type="application/json",
-#                 response_schema=list[TextWithBbox],
-#             )
-            
-#             with PIL.Image.open(processed_path) as img:
-#                 img_width, img_height = img.size
-                
-#                 response = client.models.generate_content(
-#                     model=GEMINI_MODEL,
-#                     contents=[
-#                         Part.from_bytes(
-#                             data=open(processed_path, 'rb').read(),
-#                             mime_type="image/jpeg"
-#                         ),
-#                         "Extract all text with bounding boxes from this document image."
-#                     ],
-#                     config=config
-#                 )
-                
-#                 text_data = []
-#                 full_text = ""
-                
-#                 if response.parsed:
-#                     for item in response.parsed:
-#                         # Convert normalized coordinates to pixel coordinates
-#                         y_min = int(item.box_2d[0] / 1000 * img_height)
-#                         x_min = int(item.box_2d[1] / 1000 * img_width)
-#                         y_max = int(item.box_2d[2] / 1000 * img_height)
-#                         x_max = int(item.box_2d[3] / 1000 * img_width)
-                        
-#                         text_data.append({
-#                             'text': item.text,
-#                             'bbox': [x_min, y_min, x_max, y_max],
-#                             'confidence': item.confidence
-#                         })
-#                         full_text += item.text + " "
-
-#         else:
-#             # For other OCR engines, fall back to text-only extraction
-#             text = extract_text_with_engine(image_path, ocr_engine)
-#             text_data = [{'text': text, 'bbox': None, 'confidence': 1.0}]
-#             full_text = text
-
-#         # Safe file deletion with retry
-#         if os.path.exists(processed_path):
-#             try:
-#                 import time
-#                 time.sleep(0.1)  # Brief delay
-#                 os.remove(processed_path)
-#             except PermissionError:
-#                 print(f"Warning: Could not delete temporary file {processed_path}")
-
-#         return full_text.strip(), text_data
-
-#     except Exception as e:
-#         print(f"OCR with coordinates error: {e}")
-#         return "", []
-# # 
 
 
 def extract_text_with_coordinates(image_path, ocr_engine):
@@ -1222,86 +1105,210 @@ def update_settings():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# @app.route('/process_pii', methods=['POST'])
+# def process_pii():
+#     try:
+#         if 'current_file' not in session:
+#             return jsonify({'error': 'No file to process'}), 400
+            
+#         file_info = session['current_file']
+#         file_path = file_info['path']
+        
+#         # Get selected PII entities from request
+#         data = request.get_json()
+#         selected_entities = data.get('selected_entities', [])
+#         custom_entities = data.get('custom_entities', '')
+        
+#         if not selected_entities and not custom_entities:
+#             return jsonify({'error': 'Please select at least one PII entity type to detect'}), 400
+        
+#         # Check if file still exists
+#         if not os.path.exists(file_path):
+#             return jsonify({'error': 'File not found'}), 400
+        
+#         # Detect file type
+#         file_type = detect_file_type(file_path)
+#         print(f"Processing {file_type} file: {file_path}")
+        
+#         extracted_text = ""
+#         text_data = []
+        
+#         # Extract text based on file type
+#         if file_type == 'image':
+#             extracted_text, text_data = extract_text_with_coordinates(file_path, OCR_ENGINE)
+#         elif file_type == 'pdf':
+#             extracted_text = extract_text_from_pdf(file_path)
+#         elif file_type == 'text':
+#             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+#                 extracted_text = f.read()
+#         elif file_type == 'audio':
+#             extracted_text = transcribe_audio(file_path)
+#         elif file_type == 'video':
+#             # Extract audio from video first
+#             audio_path = extract_audio_from_video(file_path)
+#             if audio_path:
+#                 extracted_text = transcribe_audio(audio_path)
+#                 try:
+#                     os.remove(audio_path)  # Clean up temp audio file
+#                 except:
+#                     pass
+#         else:
+#             return jsonify({'error': f'Unsupported file type: {file_type}'}), 400
+        
+#         if not extracted_text or len(extracted_text.strip()) < 10:
+#             return jsonify({'error': 'Could not extract sufficient text from file'}), 400
+        
+#         # Detect PII in extracted text
+#         pii_entities = detect_pii_in_text(extracted_text, selected_entities, custom_entities)
+        
+#         # Store results in session
+#         session['pii_results'] = {
+#             'file_type': file_type,
+#             'extracted_text': extracted_text,
+#             'text_data': text_data,
+#             'pii_entities': pii_entities,
+#             'selected_entities': selected_entities,
+#             'custom_entities': custom_entities,
+#             'processed_at': datetime.now().isoformat()
+#         }
+        
+#         pii_count = len(pii_entities)
+#         return jsonify({
+#             'success': True,
+#             'file_type': file_type.title(),
+#             'pii_count': pii_count,
+#             'pii_found': pii_count > 0
+#         })
+        
+#     except Exception as e:
+#         print(f"Process PII error: {str(e)}")
+#         return jsonify({'error': f'Processing failed: {str(e)}'}), 500
+#     finally:
+#         # Clean up temporary processed files
+#         safe_temp_cleanup()
+
 @app.route('/process_pii', methods=['POST'])
 def process_pii():
     try:
         if 'current_file' not in session:
             return jsonify({'error': 'No file to process'}), 400
-            
+
         file_info = session['current_file']
         file_path = file_info['path']
-        
+
         # Get selected PII entities from request
         data = request.get_json()
         selected_entities = data.get('selected_entities', [])
         custom_entities = data.get('custom_entities', '')
-        
+
         if not selected_entities and not custom_entities:
             return jsonify({'error': 'Please select at least one PII entity type to detect'}), 400
-        
+
         # Check if file still exists
         if not os.path.exists(file_path):
             return jsonify({'error': 'File not found'}), 400
-        
+
         # Detect file type
         file_type = detect_file_type(file_path)
         print(f"Processing {file_type} file: {file_path}")
-        
+
         extracted_text = ""
         text_data = []
-        
-        # Extract text based on file type
+
         if file_type == 'image':
-            extracted_text, text_data = extract_text_with_coordinates(file_path, OCR_ENGINE)
-        elif file_type == 'pdf':
-            extracted_text = extract_text_from_pdf(file_path)
+            # Use EasyOCR from common_functions
+            import cv2
+            img = cv2.imread(file_path)
+            detections = reader.readtext(file_path)
+            # detections: list of (bbox, text, confidence)
+            # Convert detections to expected format for draw_black_rectangles
+            processed_detections = [(d[0], d[1], d[2]) for d in detections]
+            # Get labels for PII detection
+            labels = selected_entities + [e.strip() for e in custom_entities.split(',') if e.strip()]
+            # Identify PII
+            pii_entities = identify_pii(
+                " ".join([d[1] for d in processed_detections]),
+                labels,
+                gliner_model,
+                None,  # llm_model, if you want to use LLM, pass it here
+                spacy_model
+            )
+            # Redact image
+            draw_black_rectangles(img, processed_detections, labels, gliner_model, None, spacy_model)
+            # Save redacted image
+            redacted_path = file_path.replace('.', '_redacted.')
+            cv2.imwrite(redacted_path, img)
+            session['pii_results'] = {
+                'file_type': file_type,
+                'redacted_image_path': redacted_path,
+                'pii_entities': list(pii_entities),
+                'selected_entities': selected_entities,
+                'custom_entities': custom_entities,
+                'processed_at': datetime.now().isoformat()
+            }
+            pii_count = len(pii_entities)
+            return jsonify({
+                'success': True,
+                'file_type': file_type.title(),
+                'pii_count': pii_count,
+                'pii_found': pii_count > 0
+            })
+
         elif file_type == 'text':
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                 extracted_text = f.read()
+            labels = selected_entities + [e.strip() for e in custom_entities.split(',') if e.strip()]
+            pii_entities = identify_pii(extracted_text, labels, gliner_model, None, spacy_model)
+            redacted_text = redact_pii(extracted_text, labels, gliner_model, None, spacy_model)
+            session['pii_results'] = {
+                'file_type': file_type,
+                'extracted_text': extracted_text,
+                'redacted_text': redacted_text,
+                'pii_entities': list(pii_entities),
+                'selected_entities': selected_entities,
+                'custom_entities': custom_entities,
+                'processed_at': datetime.now().isoformat()
+            }
+            pii_count = len(pii_entities)
+            return jsonify({
+                'success': True,
+                'file_type': file_type.title(),
+                'pii_count': pii_count,
+                'pii_found': pii_count > 0
+            })
+
         elif file_type == 'audio':
+            # Use your existing audio transcription logic, then pass text to identify_pii/redact_pii
             extracted_text = transcribe_audio(file_path)
-        elif file_type == 'video':
-            # Extract audio from video first
-            audio_path = extract_audio_from_video(file_path)
-            if audio_path:
-                extracted_text = transcribe_audio(audio_path)
-                try:
-                    os.remove(audio_path)  # Clean up temp audio file
-                except:
-                    pass
+            labels = selected_entities + [e.strip() for e in custom_entities.split(',') if e.strip()]
+            pii_entities = identify_pii(extracted_text, labels, gliner_model, None, spacy_model)
+            redacted_text = redact_pii(extracted_text, labels, gliner_model, None, spacy_model)
+            session['pii_results'] = {
+                'file_type': file_type,
+                'extracted_text': extracted_text,
+                'redacted_text': redacted_text,
+                'pii_entities': list(pii_entities),
+                'selected_entities': selected_entities,
+                'custom_entities': custom_entities,
+                'processed_at': datetime.now().isoformat()
+            }
+            pii_count = len(pii_entities)
+            return jsonify({
+                'success': True,
+                'file_type': file_type.title(),
+                'pii_count': pii_count,
+                'pii_found': pii_count > 0
+            })
+
+        # ...handle other file types as needed...
+
         else:
             return jsonify({'error': f'Unsupported file type: {file_type}'}), 400
-        
-        if not extracted_text or len(extracted_text.strip()) < 10:
-            return jsonify({'error': 'Could not extract sufficient text from file'}), 400
-        
-        # Detect PII in extracted text
-        pii_entities = detect_pii_in_text(extracted_text, selected_entities, custom_entities)
-        
-        # Store results in session
-        session['pii_results'] = {
-            'file_type': file_type,
-            'extracted_text': extracted_text,
-            'text_data': text_data,
-            'pii_entities': pii_entities,
-            'selected_entities': selected_entities,
-            'custom_entities': custom_entities,
-            'processed_at': datetime.now().isoformat()
-        }
-        
-        pii_count = len(pii_entities)
-        return jsonify({
-            'success': True,
-            'file_type': file_type.title(),
-            'pii_count': pii_count,
-            'pii_found': pii_count > 0
-        })
-        
+
     except Exception as e:
         print(f"Process PII error: {str(e)}")
         return jsonify({'error': f'Processing failed: {str(e)}'}), 500
     finally:
-        # Clean up temporary processed files
         safe_temp_cleanup()
 
 @app.route('/get_redacted_image/<filename>')

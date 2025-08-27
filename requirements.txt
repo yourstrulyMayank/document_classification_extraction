@@ -41,3 +41,6 @@ soundfile
 moviepy
 openai-whisper
 setuptools-rust
+gliner
+gliner
+easyocr
