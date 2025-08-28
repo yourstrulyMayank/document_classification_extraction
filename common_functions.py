@@ -9,6 +9,7 @@ from werkzeug.utils import secure_filename
 import easyocr
 import subprocess
 import importlib.util
+import sys
 
 def get_gliner_model(local_path="models/gliner_medium-v2.1", model_name="urchade/gliner_medium-v2.1"):
     # Check if config.json exists in local path
@@ -33,12 +34,23 @@ def get_spacy_model(model_name="en_core_web_sm"):
     except OSError:
         # If not installed, download it
         print(f"SpaCy model '{model_name}' not found. Downloading...")
-        subprocess.run(["python", "-m", "spacy", "download", model_name], check=True)
-        return spacy.load(model_name)
+        try:
+            subprocess.run([sys.executable, "-m", "spacy", "download", model_name], check=True)
+            print("Download completed, attempting to load...")
+            # Clear spaCy's internal cache and try again
+            # spacy.util.clear_cache()
+            return spacy.load(model_name)
+        except subprocess.CalledProcessError as e:
+            print(f"Failed to download SpaCy model: {e}")
+            print("You may need to run: python -m spacy download en_core_web_sm")
+            return None
+        except Exception as e:
+            print(f"Error after downloading SpaCy model: {e}")
+            return None
 
 print("Initializing models...")
-# gliner_model = get_gliner_model()
-# spacy_model = get_spacy_model()
+gliner_model = get_gliner_model()
+spacy_model = get_spacy_model()
 reader = easyocr.Reader(['en'], model_storage_directory="./models/easyocr/")
 # llm_model = Ollama(model="llama3.2")
 print("Models initialized successfully.")

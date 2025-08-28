@@ -717,6 +717,17 @@
                         </select>
                     </div>
                 </div>
+                <div class="selector-group">
+                    <label class="selector-label" for="gemini-api-key-input">Gemini API Key</label>
+                    <input
+                        type="password"
+                        id="gemini-api-key-input"
+                        class="model-dropdown"
+                        placeholder="Enter Gemini API Key"
+                        autocomplete="off"
+                        style="background: rgba(255,255,255,0.1); color: white;"
+                    />
+                </div>
                 <button id="submit-settings" class="btn" disabled>Apply Settings</button>
             </div>
         </div>
@@ -927,6 +938,12 @@
                 markSettingsChanged();
             });
 
+            // Enable Apply Settings button when Gemini API key changes
+            document.getElementById('gemini-api-key-input').addEventListener('input', function() {
+                settingsChanged = true;
+                submitSettingsBtn.disabled = false;
+            });
+
             submitSettingsBtn.addEventListener('click', updateSettings);
 
             // Upload events
@@ -966,6 +983,7 @@
             if (!settingsChanged) return;
 
             try {
+                const geminiApiKey = document.getElementById('gemini-api-key-input').value;
                 const response = await fetch('/update_settings', {
                     method: 'POST',
                     headers: {
@@ -975,7 +993,8 @@
                         ocr_engine: selectedOCR,
                         llm_provider: selectedLLM,
                         ocr_gemini_variant: selectedOCRVariant,
-                        llm_gemini_variant: selectedLLMVariant
+                        llm_gemini_variant: selectedLLMVariant,
+                        gemini_api_key: geminiApiKey 
                     })
                 });
 

@@ -59,18 +59,64 @@ import PIL
 import tempfile
 from common_functions import (
     get_gliner_model, get_spacy_model, reader,
-    identify_pii, redact_pii, draw_black_rectangles
+    identify_pii, redact_pii, draw_black_rectangles, gliner_model, spacy_model
 )
 # LLM Init
+llm_model = None  # Initialize as None
 if MODEL_PROVIDER == "huggingface":
     from transformers import pipeline
     if os.path.exists(HF_LOCAL_PATH):
         llm_pipe = pipeline("text-generation", model=HF_LOCAL_PATH, device_map="auto")
     else:
         llm_pipe = pipeline("text-generation", model=MODEL_NAME, device_map="auto")
+    llm_model = llm_pipe  # Set the llm_model for common_functions
+elif MODEL_PROVIDER == "ollama":
+    # For Ollama, we'll create a wrapper class to match the interface expected by common_functions
+    class OllamaWrapper:
+        def __init__(self, model_name):
+            self.model_name = model_name
+        
+        def invoke(self, prompt):
+            try:
+                result = subprocess.run(
+                    ["ollama", "run", self.model_name],
+                    input=prompt,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    timeout=60,
+                    encoding='utf-8',
+                    errors='ignore'
+                )
+                if result.returncode == 0:
+                    return result.stdout.strip()
+                else:
+                    print(f"Ollama error: {result.stderr}")
+                    return ""
+            except Exception as e:
+                print(f"Ollama error: {e}")
+                return ""
+    
+    llm_model = OllamaWrapper(MODEL_NAME)
+elif MODEL_PROVIDER == "api":
+    # For Gemini API, create wrapper class
+    class GeminiWrapper:
+        def __init__(self):
+            import google.generativeai as genai
+            genai.configure(api_key=GEMINI_API_KEY)
+            self.model = genai.GenerativeModel(GEMINI_MODEL)
+        
+        def invoke(self, prompt):
+            try:
+                response = self.model.generate_content(prompt)
+                return response.text.strip()
+            except Exception as e:
+                print(f"Gemini API error: {e}")
+                return ""
+    
+    llm_model = GeminiWrapper()
 
-gliner_model = get_gliner_model()
-spacy_model = get_spacy_model()
+
 # OCR Init
 
 
@@ -1084,14 +1130,20 @@ def upload_file():
 @app.route('/update_settings', methods=['POST'])
 def update_settings():
     try:
-        global OCR_ENGINE, MODEL_PROVIDER, GEMINI_MODEL
+        global OCR_ENGINE, MODEL_PROVIDER, GEMINI_MODEL, GEMINI_API_KEY
         
         data = request.get_json()
+        old_api_key = GEMINI_API_KEY
         
+        
+
         # Update global variables
         OCR_ENGINE = data.get('ocr_engine', OCR_ENGINE)
         MODEL_PROVIDER = data.get('llm_provider', MODEL_PROVIDER)
+        GEMINI_API_KEY = data.get('gemini_api_key', GEMINI_API_KEY)
         
+        if GEMINI_API_KEY != old_api_key:
+            print(f"GEMINI_API_KEY updated.")
         # Update Gemini model based on which service is using it
         if OCR_ENGINE == 'gemini':
             GEMINI_MODEL = data.get('ocr_gemini_variant', GEMINI_MODEL)
@@ -1212,40 +1264,53 @@ def process_pii():
         file_type = detect_file_type(file_path)
         print(f"Processing {file_type} file: {file_path}")
 
-        extracted_text = ""
-        text_data = []
+        # Prepare labels for PII detection
+        labels = selected_entities + [e.strip() for e in custom_entities.split(',') if e.strip()]
 
         if file_type == 'image':
             # Use EasyOCR from common_functions
             import cv2
             img = cv2.imread(file_path)
+            if img is None:
+                return jsonify({'error': 'Could not read image file'}), 400
+                
             detections = reader.readtext(file_path)
             # detections: list of (bbox, text, confidence)
+            
             # Convert detections to expected format for draw_black_rectangles
             processed_detections = [(d[0], d[1], d[2]) for d in detections]
-            # Get labels for PII detection
-            labels = selected_entities + [e.strip() for e in custom_entities.split(',') if e.strip()]
+            
+            # Get full text for PII identification
+            full_text = " ".join([d[1] for d in processed_detections])
+            
             # Identify PII
-            pii_entities = identify_pii(
-                " ".join([d[1] for d in processed_detections]),
-                labels,
-                gliner_model,
-                None,  # llm_model, if you want to use LLM, pass it here
-                spacy_model
-            )
+            pii_entities = identify_pii(full_text, labels, gliner_model, llm_model, spacy_model)
+            
             # Redact image
-            draw_black_rectangles(img, processed_detections, labels, gliner_model, None, spacy_model)
+            draw_black_rectangles(img, processed_detections, labels, gliner_model, llm_model, spacy_model)
+            
             # Save redacted image
-            redacted_path = file_path.replace('.', '_redacted.')
+            import uuid
+            redacted_filename = f"redacted_{uuid.uuid4().hex[:8]}.png"
+            redacted_path = os.path.join(app.config['UPLOAD_FOLDER'], redacted_filename)
             cv2.imwrite(redacted_path, img)
+            
+            # Store in session for cleanup
+            if 'temp_files' not in session:
+                session['temp_files'] = []
+            session['temp_files'].append(redacted_path)
+            
             session['pii_results'] = {
                 'file_type': file_type,
                 'redacted_image_path': redacted_path,
-                'pii_entities': list(pii_entities),
+                'redacted_image_filename': redacted_filename,
+                'extracted_text': full_text,
+                'pii_entities': [{'text': ent[0], 'type': ent[1], 'redaction': f'<{ent[1]}>'} for ent in pii_entities],
                 'selected_entities': selected_entities,
                 'custom_entities': custom_entities,
                 'processed_at': datetime.now().isoformat()
             }
+            
             pii_count = len(pii_entities)
             return jsonify({
                 'success': True,
@@ -1257,18 +1322,20 @@ def process_pii():
         elif file_type == 'text':
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                 extracted_text = f.read()
-            labels = selected_entities + [e.strip() for e in custom_entities.split(',') if e.strip()]
-            pii_entities = identify_pii(extracted_text, labels, gliner_model, None, spacy_model)
-            redacted_text = redact_pii(extracted_text, labels, gliner_model, None, spacy_model)
+                
+            pii_entities = identify_pii(extracted_text, labels, gliner_model, llm_model, spacy_model)
+            redacted_text = redact_pii(extracted_text, labels, gliner_model, llm_model, spacy_model)
+            
             session['pii_results'] = {
                 'file_type': file_type,
                 'extracted_text': extracted_text,
                 'redacted_text': redacted_text,
-                'pii_entities': list(pii_entities),
+                'pii_entities': [{'text': ent[0], 'type': ent[1], 'redaction': f'<{ent[1]}>'} for ent in pii_entities],
                 'selected_entities': selected_entities,
                 'custom_entities': custom_entities,
                 'processed_at': datetime.now().isoformat()
             }
+            
             pii_count = len(pii_entities)
             return jsonify({
                 'success': True,
@@ -1280,18 +1347,22 @@ def process_pii():
         elif file_type == 'audio':
             # Use your existing audio transcription logic, then pass text to identify_pii/redact_pii
             extracted_text = transcribe_audio(file_path)
-            labels = selected_entities + [e.strip() for e in custom_entities.split(',') if e.strip()]
-            pii_entities = identify_pii(extracted_text, labels, gliner_model, None, spacy_model)
-            redacted_text = redact_pii(extracted_text, labels, gliner_model, None, spacy_model)
+            if not extracted_text:
+                return jsonify({'error': 'Could not transcribe audio file'}), 400
+                
+            pii_entities = identify_pii(extracted_text, labels, gliner_model, llm_model, spacy_model)
+            redacted_text = redact_pii(extracted_text, labels, gliner_model, llm_model, spacy_model)
+            
             session['pii_results'] = {
                 'file_type': file_type,
                 'extracted_text': extracted_text,
                 'redacted_text': redacted_text,
-                'pii_entities': list(pii_entities),
+                'pii_entities': [{'text': ent[0], 'type': ent[1], 'redaction': f'<{ent[1]}>'} for ent in pii_entities],
                 'selected_entities': selected_entities,
                 'custom_entities': custom_entities,
                 'processed_at': datetime.now().isoformat()
             }
+            
             pii_count = len(pii_entities)
             return jsonify({
                 'success': True,
@@ -1300,13 +1371,39 @@ def process_pii():
                 'pii_found': pii_count > 0
             })
 
-        # ...handle other file types as needed...
+        elif file_type == 'pdf':
+            extracted_text = extract_text_from_pdf(file_path)
+            if not extracted_text:
+                return jsonify({'error': 'Could not extract text from PDF'}), 400
+                
+            pii_entities = identify_pii(extracted_text, labels, gliner_model, llm_model, spacy_model)
+            redacted_text = redact_pii(extracted_text, labels, gliner_model, llm_model, spacy_model)
+            
+            session['pii_results'] = {
+                'file_type': file_type,
+                'extracted_text': extracted_text,
+                'redacted_text': redacted_text,
+                'pii_entities': [{'text': ent[0], 'type': ent[1], 'redaction': f'<{ent[1]}>'} for ent in pii_entities],
+                'selected_entities': selected_entities,
+                'custom_entities': custom_entities,
+                'processed_at': datetime.now().isoformat()
+            }
+            
+            pii_count = len(pii_entities)
+            return jsonify({
+                'success': True,
+                'file_type': file_type.title(),
+                'pii_count': pii_count,
+                'pii_found': pii_count > 0
+            })
 
         else:
             return jsonify({'error': f'Unsupported file type: {file_type}'}), 400
 
     except Exception as e:
         print(f"Process PII error: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': f'Processing failed: {str(e)}'}), 500
     finally:
         safe_temp_cleanup()
@@ -1324,6 +1421,72 @@ def get_redacted_image(filename):
     except Exception as e:
         return str(e), 500
 
+# @app.route('/get_redacted_content', methods=['POST'])
+# def get_redacted_content():
+#     try:
+#         if 'pii_results' not in session:
+#             return jsonify({'error': 'No PII processing results found'}), 400
+            
+#         if 'current_file' not in session:
+#             return jsonify({'error': 'No file found'}), 400
+        
+#         results = session['pii_results']
+#         file_info = session['current_file']
+#         file_path = file_info['path']
+        
+#         file_type = results['file_type']
+#         extracted_text = results['extracted_text']
+#         text_data = results['text_data']
+#         pii_entities = results['pii_entities']
+        
+#         response_data = {
+#             'success': True,
+#             'file_type': file_type,
+#             'pii_entities': pii_entities,
+#             'original_text': extracted_text
+#         }
+        
+#         if file_type == 'image':
+#             # Create redacted image and save temporarily
+#             redacted_image_path, redaction_areas = create_redacted_image_with_coordinates(file_path, text_data, pii_entities)
+            
+#             if redacted_image_path and os.path.exists(redacted_image_path):
+#                 # Convert original image to base64
+#                 with open(file_path, 'rb') as f:
+#                     original_image_b64 = base64.b64encode(f.read()).decode()
+                
+#                 # Use URL for redacted image instead of base64
+#                 redacted_filename = os.path.basename(redacted_image_path)
+                
+#                 response_data.update({
+#                     'original_image': f"data:image/jpeg;base64,{original_image_b64}",
+#                     'redacted_image_url': f"/get_redacted_image/{redacted_filename}",
+#                     'redaction_areas': redaction_areas
+#                 })
+                
+#             else:
+#                 return jsonify({'error': 'Failed to create redacted image'}), 500
+                
+#         else:
+#             # For text-based content, create redacted text
+#             redacted_text = create_redacted_text(extracted_text, pii_entities)
+#             response_data['redacted_text'] = redacted_text
+            
+#             # For audio/video, also provide file path for audio player
+#             if file_type in ['audio', 'video']:
+#                 try:
+#                     with open(file_path, 'rb') as f:
+#                         audio_b64 = base64.b64encode(f.read()).decode()
+#                     response_data['audio_data'] = f"data:audio/mpeg;base64,{audio_b64}"
+#                 except:
+#                     response_data['audio_data'] = None
+        
+#         return jsonify(response_data)
+        
+#     except Exception as e:
+#         print(f"Get redacted content error: {str(e)}")
+#         return jsonify({'error': f'Failed to create redacted content: {str(e)}'}), 500
+
 @app.route('/get_redacted_content', methods=['POST'])
 def get_redacted_content():
     try:
@@ -1338,8 +1501,7 @@ def get_redacted_content():
         file_path = file_info['path']
         
         file_type = results['file_type']
-        extracted_text = results['extracted_text']
-        text_data = results['text_data']
+        extracted_text = results.get('extracted_text', '')
         pii_entities = results['pii_entities']
         
         response_data = {
@@ -1350,29 +1512,24 @@ def get_redacted_content():
         }
         
         if file_type == 'image':
-            # Create redacted image and save temporarily
-            redacted_image_path, redaction_areas = create_redacted_image_with_coordinates(file_path, text_data, pii_entities)
-            
-            if redacted_image_path and os.path.exists(redacted_image_path):
+            # Use the saved redacted image
+            redacted_filename = results.get('redacted_image_filename')
+            if redacted_filename:
                 # Convert original image to base64
                 with open(file_path, 'rb') as f:
                     original_image_b64 = base64.b64encode(f.read()).decode()
                 
-                # Use URL for redacted image instead of base64
-                redacted_filename = os.path.basename(redacted_image_path)
-                
                 response_data.update({
                     'original_image': f"data:image/jpeg;base64,{original_image_b64}",
                     'redacted_image_url': f"/get_redacted_image/{redacted_filename}",
-                    'redaction_areas': redaction_areas
+                    'redaction_areas': []  # You can implement hover areas later if needed
                 })
-                
             else:
-                return jsonify({'error': 'Failed to create redacted image'}), 500
+                return jsonify({'error': 'Redacted image not found'}), 500
                 
         else:
-            # For text-based content, create redacted text
-            redacted_text = create_redacted_text(extracted_text, pii_entities)
+            # For text-based content, use the redacted text from results
+            redacted_text = results.get('redacted_text', extracted_text)
             response_data['redacted_text'] = redacted_text
             
             # For audio/video, also provide file path for audio player
@@ -1388,8 +1545,9 @@ def get_redacted_content():
         
     except Exception as e:
         print(f"Get redacted content error: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': f'Failed to create redacted content: {str(e)}'}), 500
-
 
 
 @app.route('/get_pii_categories', methods=['GET'])
