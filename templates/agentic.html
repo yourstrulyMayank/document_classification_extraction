@@ -1,0 +1,1633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PII Detection & Masking</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #fdf6f0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 40px;
+            padding: 15px 30px;
+            background: #fdf6f0;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        
+        header img {
+            height: 75px;
+            transition: transform 0.3s ease;
+        }
+        
+        header img:hover {
+            transform: scale(1.05);
+        }
+        
+        .settings-icon {
+            position: fixed;
+            bottom: 10px;
+            left: 0;
+            background: #3f3d3dff;
+            color: white;
+            width: 60px;
+            height: 60px;
+            border-radius: 0 8px 8px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 1000;
+            transition: all 0.3s ease;
+            box-shadow: 2px 4px 15px rgba(75, 108, 183, 0.4);
+        }
+
+        .settings-icon:hover {
+            transform: translateX(1px);
+            box-shadow: 2px 6px 20px rgba(75, 108, 183, 0.6);
+        }
+
+        .sidebar {
+            width: 250px;
+            background: linear-gradient(180deg, #4b6cb7 0%, #182848 100%);
+            padding: 2rem 1rem;
+            min-height: 100vh;
+            color: white;
+            position: fixed;
+            left: -250px;
+            top: 0;
+            transition: left 0.3s ease;
+            z-index: 999;
+        }
+
+        .sidebar.open {
+            left: 0;
+        }
+
+        .sidebar-content {
+            margin-top: 60px;
+        }
+
+        .close-icon {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .close-icon:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.1);
+        }
+
+        nav {
+            width: 100%;
+            text-align: left;
+            padding: 10px 20px;
+            background-color: #005bb5;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .nav-item {
+            color: rgba(255, 255, 255, 0.8);
+            padding: 0.75rem 1rem;
+            margin: 0.5rem 0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+        }
+
+        .nav-item:hover, .nav-item.active {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border-left-color: #4CAF50;
+        }
+
+        .main-content {
+            flex: 1;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+        }
+        
+
+        .app-title {
+            color: #182848;
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .card {
+            background: linear-gradient(180deg, #4b6cb7 0%, #182848 100%);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+            width: 600px;              /* Initial width */
+            max-width: 90vw;
+            min-width: 320px;
+            text-align: center;
+            transition: width 0.4s cubic-bezier(.4,2,.6,1), max-width 0.4s cubic-bezier(.4,2,.6,1);
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .card.expanded {
+            width: 80vw;               /* Expanded width */
+            max-width: 1400px;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+        }
+
+        .card h2 {
+            color: #ffffffff;
+            margin-bottom: 1.5rem;
+            font-size: 2rem;
+        }
+
+        .upload-area {
+        border: 2px dashed #ddd;
+        border-radius: 12px;
+        padding: 3rem 2rem;
+        margin: 2rem 0;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        background: #f8f9fa;
+        max-width: 600px;
+        width: 100%;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+        .upload-area:hover {
+            border-color: #667eea;
+            background: #f0f2ff;
+        }
+
+        .upload-area.dragover {
+            border-color: #4CAF50;
+            background: #e8f5e8;
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            color: #ddd;
+            margin-bottom: 1rem;
+        }
+
+        .upload-text {
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        .file-input {
+            display: none;
+        }
+        .back-btn {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+            display: none;
+        }
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateX(-2px);
+        }
+
+        .back-btn.show {
+            display: inline-block;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 0.75rem 2rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin: 0.5rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        .btn:disabled {
+            background: #635e5eff;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+        }
+
+        .btn-success:hover {
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.6);
+        }
+
+        .btn-small {
+            background: #005bb5;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;            
+            transition: all 0.3s ease;
+        }
+
+        .processing {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            margin: 2rem 0;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .result-section {
+            display: none;
+            margin-top: 2rem;
+            text-align: left;
+        }
+
+        .detection-result {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 1rem;
+        }
+
+        .file-type {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #1565c0;
+            margin-bottom: 0.5rem;
+        }
+
+        .pii-count {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .alert {
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+
+        .alert-error {
+            background: #ffebee;
+            color: #c62828;
+            border-left: 4px solid #f44336;
+        }
+
+        .alert-success {
+            background: #e8f5e8;
+            color: #2e7d32;
+            border-left: 4px solid #4CAF50;
+        }
+
+        .file-info {
+            display: none;
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            text-align: left;
+        }
+
+        .model-selector {
+            margin: 2rem 0;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .selector-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .selector-label {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.9rem;
+        }
+
+        .model-dropdown {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            color: white;
+            padding: 0.5rem;
+            font-size: 0.9rem;
+            width: 100%;
+        }
+
+        .model-dropdown option {
+            background: #333;
+            color: white;
+        }
+
+        .clear-btn {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
+            margin-top: 1rem;
+        }
+
+        .clear-btn:hover {
+            box-shadow: 0 6px 20px rgba(255, 107, 107, 0.6);
+        }
+
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 998;
+            display: none;
+        }
+
+        .sidebar-overlay.active {
+            display: block;
+        }
+
+        .sub-options {
+            margin-top: 10px;
+            margin-left: 15px;
+            padding-left: 10px;
+            border-left: 2px solid #ddd;
+        }
+
+        .pii-selection {
+            display: none;
+            background: #f8f9fa;
+            padding: 2rem;
+            border-radius: 12px;
+            margin: 1rem auto;
+            text-align: left;
+            width: 80vw;
+            max-width: 1200px;
+            min-width: 320px;
+            align-self: center;       /* Center inside .card */
+        }
+
+        .pii-selection h3 {
+            color: #333;
+            margin-bottom: 1rem;
+        }
+
+        .pii-categories {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr); /* 3 columns */
+                gap: 1rem;
+                margin-bottom: 1rem;
+            }
+
+        .pii-category {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .category-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 0.5rem;
+            font-size: 1rem;
+        }
+
+        .pii-entity {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .pii-entity input[type="checkbox"] {
+            margin-right: 0.5rem;
+        }
+
+        .pii-entity label {
+            font-size: 0.9rem;
+            color: #666;
+            cursor: pointer;
+        }
+
+        .custom-entities {
+            margin: 1rem 0;
+        }
+
+        .custom-entities label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #333;
+            font-weight: bold;
+        }
+
+        .custom-entities input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+
+        .entity-controls {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .results-section {
+            display: none;
+            width: 100%;
+            max-width: 1400px;
+            margin: 2rem auto;
+        }
+
+        .results-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .original-panel, .redacted-panel {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            min-height: 500px;
+        }
+
+        .original-panel h3, .redacted-panel h3 {
+            color: #333;
+            margin-bottom: 1rem;
+            font-size: 1.3rem;
+        }
+
+        .content-display {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 1rem;
+            min-height: 400px;
+            background: #f9f9f9;
+            overflow: auto;
+        }
+
+        .content-display img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+        }
+
+        .content-display audio, .content-display video {
+            width: 100%;
+            max-width: 500px;
+        }
+
+        .content-display pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        .content-loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 200px;
+            color: #666;
+        }
+
+        .pii-summary {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .pii-summary h3 {
+            color: #333;
+            margin-bottom: 1rem;
+            font-size: 1.3rem;
+        }
+
+        .pii-entities-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+
+        .pii-entity-card {
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 1rem;
+        }
+
+        .pii-entity-type {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+
+        .pii-entity-text {
+            color: #666;
+            font-family: 'Courier New', monospace;
+            background: white;
+            padding: 0.5rem;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            margin-bottom: 0.5rem;
+        }
+
+        .pii-entity-redaction {
+            color: #007bff;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 1200px) {
+            .results-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 1rem;
+            }
+            
+            .card {
+                padding: 1.5rem;
+            }
+
+            .app-title {
+                font-size: 2rem;
+                margin-bottom: 1.5rem;
+            }
+            
+            header {
+                gap: 20px;
+            }
+            
+            header img {
+                height: 50px;
+            }
+
+            .pii-categories {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr); /* 3 columns */
+                gap: 1rem;
+                margin-bottom: 1rem;
+            }
+
+            
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header with logos -->
+    <header>
+        <img src="/static/infosys.png" alt="Infosys Logo"> 
+        <div class="app-title">
+            🤖 Agentic AI Processing
+        </div>         
+        <img src="/static/ABCBank.png" alt="ABC Bank Logo">
+    </header>
+    <nav>
+        <button onclick="window.history.back()" class="btn-small">⬅ Back</button>
+    </nav>
+
+    <!-- Settings Icon -->
+    <div class="settings-icon" id="settings-icon">
+        <h1>⚙️</h1>
+    </div>
+
+    <!-- Sidebar Overlay -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+    
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-content">
+            <div class="model-selector">
+                <div class="selector-group">
+                    <label class="selector-label">OCR Model</label>
+                    <select id="ocr-selector" class="model-dropdown">
+                        <option value="tesseract">Tesseract</option>
+                        <option value="easyocr">EasyOCR</option>
+                        <option value="paddleocr">PaddleOCR</option>
+                        <option value="gemini">Gemini</option>
+                    </select>
+                    <div id="ocr-gemini-options" class="sub-options" style="display: none;">
+                        <label class="selector-label">Gemini OCR Variant</label>
+                        <select id="ocr-gemini-variant" class="model-dropdown">
+                            <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                            <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                            <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</option>
+                            <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                            <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="selector-group">
+                    <label class="selector-label">LLM Model</label>
+                    <select id="llm-selector" class="model-dropdown">
+                        <option value="huggingface">HuggingFace</option>
+                        <option value="ollama">Ollama</option>
+                        <option value="api">API (Gemini)</option>
+                    </select>
+                    <div id="llm-gemini-options" class="sub-options" style="display: none;">
+                        <label class="selector-label">Gemini LLM Variant</label>
+                        <select id="llm-gemini-variant" class="model-dropdown">
+                            <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                            <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                            <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</option>
+                            <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                            <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="selector-group">
+                    <label class="selector-label" for="gemini-api-key-input">Gemini API Key</label>
+                    <input
+                        type="password"
+                        id="gemini-api-key-input"
+                        class="model-dropdown"
+                        placeholder="Enter Gemini API Key"
+                        autocomplete="off"
+                        style="background: rgba(255,255,255,0.1); color: white;"
+                    />
+                </div>
+                <button id="submit-settings" class="btn" disabled>Apply Settings</button>
+            </div>
+        </div>
+        
+        <!-- Close Icon -->
+        <div class="close-icon" id="close-icon">
+            ✕
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="card">
+            <h2>Multi-Agent Document Processing Pipeline</h2>
+            <p style="color: #ffffffff; margin-bottom: 2rem;">
+                Upload a document to run through our intelligent multi-agent system: 
+                <br><strong>Agent 1:</strong> PII Detection & Redaction 
+                <br><strong>Agent 2:</strong> Document Classification & Data Extraction
+            </p>
+
+            <!-- Upload Section -->
+            <div id="upload-section">
+                <div class="upload-area" id="upload-area">
+                    <div class="upload-icon">📁</div>
+                    <div class="upload-text">
+                        <strong>Click to upload</strong> or drag and drop<br>
+                        <small>PDF, Images, Audio, Video, Text files (max 16MB)</small>
+                    </div>
+                </div>
+                <input type="file" id="file-input" class="file-input" accept=".pdf,.png,.jpg,.jpeg,.tiff,.bmp,.mp3,.wav,.flac,.m4a,.aac,.ogg,.mp4,.avi,.mov,.mkv,.wmv,.txt,.rtf,.doc,.docx">
+                
+                <!-- PII Entity Selection -->
+                <div id="pii-selection" class="pii-selection">
+                    <h3>🏷️ Select PII Entities to Detect</h3>
+                    <div id="pii-categories" class="pii-categories">
+                        <!-- Categories will be populated by JavaScript -->
+                    </div>
+                    
+                    <!-- Custom Entities -->
+                    <div class="custom-entities">
+                        <label for="custom-entities-input">Custom Entities (comma-separated):</label>
+                        <input type="text" id="custom-entities-input" placeholder="e.g., Employee Number, Project Code, Client Name">
+                    </div>
+                    
+                    <!-- Select All/None buttons -->
+                    <div class="entity-controls">
+                        <button id="select-all-btn" class="btn-small">Select All</button>
+                        <button id="select-none-btn" class="btn-small">Select None</button>
+                    </div>
+                </div>
+                
+                <button id="process-btn" class="btn" disabled>🤖 Start Agentic Processing</button>
+            </div>
+
+            <!-- File Info -->
+            <div id="file-info" class="file-info">
+                <strong>Selected File:</strong> <span id="file-name"></span><br>
+                <strong>Size:</strong> <span id="file-size"></span><br>
+                <strong>Type:</strong> <span id="file-type"></span>
+            </div>
+
+            <!-- Processing Section with Agent Status -->
+            <div id="processing" class="processing">
+                <div class="agent-pipeline">
+                    <div class="agent-step" id="agent1-step">
+                        <div class="agent-icon">🛡️</div>
+                        <div class="agent-info">
+                            <h3>Agent 1: PII Detection</h3>
+                            <p id="agent1-status">Waiting...</p>
+                        </div>
+                        <div class="agent-status-indicator" id="agent1-indicator"></div>
+                    </div>
+                    
+                    <div class="pipeline-arrow">➤</div>
+                    
+                    <div class="agent-step" id="agent2-step">
+                        <div class="agent-icon">📄</div>
+                        <div class="agent-info">
+                            <h3>Agent 2: Classification</h3>
+                            <p id="agent2-status">Waiting...</p>
+                        </div>
+                        <div class="agent-status-indicator" id="agent2-indicator"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Section -->
+            <div id="result-section" class="result-section">
+                <div class="agent-results">
+                    <div class="agent-result-card">
+                        <h3>🛡️ Agent 1 Results</h3>
+                        <div class="result-details">
+                            <div class="file-type" id="detected-file-type">File Type: Unknown</div>
+                            <div class="pii-count" id="pii-count">PII Entities Found: 0</div>
+                        </div>
+                    </div>
+                    
+                    <div class="agent-result-card">
+                        <h3>📄 Agent 2 Results</h3>
+                        <div class="result-details">
+                            <div class="doc-classification" id="doc-classification">Document Type: Unknown</div>
+                            <div class="extraction-status" id="extraction-status">Data Extraction: Pending</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="results-actions">
+                    <button id="show-pii-results-btn" class="btn btn-success">👁️ View PII Results</button>
+                    <button id="show-extraction-results-btn" class="btn btn-success">📊 View Extracted Data</button>
+                    <button id="show-pipeline-summary-btn" class="btn btn-primary">📋 Pipeline Summary</button>
+                </div>
+            </div>
+
+            <!-- Clear Session -->
+            <button id="clear-btn" class="btn clear-btn" style="display: none;">🗑️ Clear & Start Over</button>
+
+            <!-- Alerts -->
+            <div id="alert-container"></div>
+        </div>
+
+        <!-- PII Results Display Section -->
+        <div id="pii-results-section" class="results-section">
+            <h2>🛡️ Agent 1: PII Detection Results</h2>
+            <div class="results-container">
+                <div class="original-panel">
+                    <h3 id="original-title">📄 Original Content</h3>
+                    <div id="original-display" class="content-display"></div>
+                </div>
+                <div class="redacted-panel">
+                    <h3 id="redacted-title">🔒 Redacted Content</h3>
+                    <div id="redacted-display" class="content-display"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Extraction Results Display Section -->
+        <div id="extraction-results-section" class="results-section">
+            <h2>📄 Agent 2: Document Classification & Extraction Results</h2>
+            <div class="extraction-container">
+                <div class="classification-panel">
+                    <h3>📋 Document Classification</h3>
+                    <div id="classification-display" class="content-display"></div>
+                </div>
+                <div class="extraction-panel">
+                    <h3>🔍 Extracted Data</h3>
+                    <div id="extraction-display" class="content-display"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pipeline Summary Section -->
+        <div id="pipeline-summary-section" class="results-section">
+            <h2>📋 Complete Pipeline Summary</h2>
+            <div class="summary-container">
+                <div class="summary-timeline">
+                    <div class="timeline-step">
+                        <div class="timeline-icon">📤</div>
+                        <div class="timeline-content">
+                            <h4>File Upload</h4>
+                            <p id="upload-summary">File uploaded successfully</p>
+                        </div>
+                    </div>
+                    
+                    <div class="timeline-step">
+                        <div class="timeline-icon">🛡️</div>
+                        <div class="timeline-content">
+                            <h4>Agent 1: PII Detection</h4>
+                            <p id="pii-summary">PII detection completed</p>
+                        </div>
+                    </div>
+                    
+                    <div class="timeline-step">
+                        <div class="timeline-icon">📄</div>
+                        <div class="timeline-content">
+                            <h4>Agent 2: Classification & Extraction</h4>
+                            <p id="classification-summary">Document processing completed</p>
+                        </div>
+                    </div>
+                    
+                    <div class="timeline-step">
+                        <div class="timeline-icon">✅</div>
+                        <div class="timeline-content">
+                            <h4>Pipeline Complete</h4>
+                            <p id="completion-summary">All agents completed successfully</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="summary-stats">
+                    <div class="stat-card">
+                        <div class="stat-number" id="total-processing-time">--</div>
+                        <div class="stat-label">Total Processing Time</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="total-pii-found">--</div>
+                        <div class="stat-label">PII Entities Found</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="final-doc-type">--</div>
+                        <div class="stat-label">Document Type</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        const fileInput = document.getElementById('file-input');
+        const uploadArea = document.getElementById('upload-area');
+        const processBtn = document.getElementById('process-btn');
+        const showPiiResultsBtn = document.getElementById('show-pii-results-btn');
+        const showExtractionResultsBtn = document.getElementById('show-extraction-results-btn');
+        const showPipelineSummaryBtn = document.getElementById('show-pipeline-summary-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        const processing = document.getElementById('processing');
+        const fileInfo = document.getElementById('file-info');
+        const fileName = document.getElementById('file-name');
+        const fileSize = document.getElementById('file-size');
+        const fileType = document.getElementById('file-type');
+        const resultSection = document.getElementById('result-section');
+        const piiResultsSection = document.getElementById('pii-results-section');
+        const extractionResultsSection = document.getElementById('extraction-results-section');
+        const pipelineSummarySection = document.getElementById('pipeline-summary-section');
+        const alertContainer = document.getElementById('alert-container');
+        const uploadSection = document.getElementById('upload-section');
+        const piiSelection = document.getElementById('pii-selection');
+        const piiCategories = document.getElementById('pii-categories');
+        const customEntitiesInput = document.getElementById('custom-entities-input');
+        const selectAllBtn = document.getElementById('select-all-btn');
+        const selectNoneBtn = document.getElementById('select-none-btn');
+        
+        // Agent status elements
+        const agent1Status = document.getElementById('agent1-status');
+        const agent2Status = document.getElementById('agent2-status');
+        const agent1Indicator = document.getElementById('agent1-indicator');
+        const agent2Indicator = document.getElementById('agent2-indicator');
+        const agent1Step = document.getElementById('agent1-step');
+        const agent2Step = document.getElementById('agent2-step');
+        
+        // Result display elements
+        const detectedFileType = document.getElementById('detected-file-type');
+        const piiCount = document.getElementById('pii-count');
+        const docClassification = document.getElementById('doc-classification');
+        const extractionStatus = document.getElementById('extraction-status');
+        
+        // Sidebar elements
+        const settingsIcon = document.getElementById('settings-icon');
+        const sidebar = document.getElementById('sidebar');
+        const closeIcon = document.getElementById('close-icon');
+        const sidebarOverlay = document.getElementById('sidebar-overlay');
+        const submitSettingsBtn = document.getElementById('submit-settings');
+        const ocrGeminiOptions = document.getElementById('ocr-gemini-options');
+        const llmGeminiOptions = document.getElementById('llm-gemini-options');
+        
+        // State variables
+        let selectedOCR = 'gemini';
+        let selectedLLM = 'api';
+        let selectedOCRVariant = 'gemini-2.5-pro';
+        let selectedLLMVariant = 'gemini-2.5-pro';
+        let settingsChanged = false;
+        let currentFile = null;
+        let piiCategoriesData = {};
+        let pipelineResults = {};
+        let processingStartTime = null;
+
+        // Initialize the application
+        async function init() {
+            setupEventListeners();
+            await loadPIICategories();
+            setDefaultSettings();
+        }
+
+        function setDefaultSettings() {
+            document.getElementById('ocr-selector').value = selectedOCR;
+            document.getElementById('llm-selector').value = selectedLLM;
+            document.getElementById('ocr-gemini-variant').value = selectedOCRVariant;
+            document.getElementById('llm-gemini-variant').value = selectedLLMVariant;
+
+            if (selectedOCR === 'gemini') {
+                ocrGeminiOptions.style.display = 'block';
+            }
+            if (selectedLLM === 'api') {
+                llmGeminiOptions.style.display = 'block';
+            }
+        }
+
+        function setupEventListeners() {
+            // Sidebar events
+            settingsIcon.addEventListener('click', toggleSidebar);
+            closeIcon.addEventListener('click', closeSidebar);
+            sidebarOverlay.addEventListener('click', closeSidebar);
+
+            // Settings events
+            document.getElementById('ocr-selector').addEventListener('change', (e) => {
+                selectedOCR = e.target.value;
+                ocrGeminiOptions.style.display = selectedOCR === 'gemini' ? 'block' : 'none';
+                markSettingsChanged();
+            });
+
+            document.getElementById('llm-selector').addEventListener('change', (e) => {
+                selectedLLM = e.target.value;
+                llmGeminiOptions.style.display = selectedLLM === 'api' ? 'block' : 'none';
+                markSettingsChanged();
+            });
+
+            document.getElementById('ocr-gemini-variant').addEventListener('change', (e) => {
+                selectedOCRVariant = e.target.value;
+                markSettingsChanged();
+            });
+
+            document.getElementById('llm-gemini-variant').addEventListener('change', (e) => {
+                selectedLLMVariant = e.target.value;
+                markSettingsChanged();
+            });
+
+            document.getElementById('gemini-api-key-input').addEventListener('input', function() {
+                settingsChanged = true;
+                submitSettingsBtn.disabled = false;
+            });
+
+            submitSettingsBtn.addEventListener('click', updateSettings);
+
+            // Upload events
+            uploadArea.addEventListener('click', () => fileInput.click());
+            uploadArea.addEventListener('dragover', handleDragOver);
+            uploadArea.addEventListener('dragleave', handleDragLeave);
+            uploadArea.addEventListener('drop', handleDrop);
+
+            fileInput.addEventListener('change', handleFileSelect);
+            processBtn.addEventListener('click', processAgentic);
+            showPiiResultsBtn.addEventListener('click', () => showResultsSection('pii'));
+            showExtractionResultsBtn.addEventListener('click', () => showResultsSection('extraction'));
+            showPipelineSummaryBtn.addEventListener('click', () => showResultsSection('summary'));
+            clearBtn.addEventListener('click', clearSession);
+
+            // PII selection events
+            selectAllBtn.addEventListener('click', selectAllEntities);
+            selectNoneBtn.addEventListener('click', selectNoneEntities);
+            customEntitiesInput.addEventListener('input', updateProcessButton);
+        }
+
+        // Sidebar functions (reused from PII page)
+        function toggleSidebar() {
+            sidebar.classList.add('open');
+            sidebarOverlay.classList.add('active');
+        }
+
+        function closeSidebar() {
+            sidebar.classList.remove('open');
+            sidebarOverlay.classList.remove('active');
+        }
+
+        function markSettingsChanged() {
+            settingsChanged = true;
+            submitSettingsBtn.disabled = false;
+            submitSettingsBtn.textContent = 'Apply Settings';
+        }
+
+        async function updateSettings() {
+            if (!settingsChanged) return;
+
+            try {
+                const geminiApiKey = document.getElementById('gemini-api-key-input').value;
+                const response = await fetch('/update_settings', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        ocr_engine: selectedOCR,
+                        llm_provider: selectedLLM,
+                        ocr_gemini_variant: selectedOCRVariant,
+                        llm_gemini_variant: selectedLLMVariant,
+                        gemini_api_key: geminiApiKey 
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    showAlert('Settings updated successfully!', 'success');
+                    settingsChanged = false;
+                    submitSettingsBtn.disabled = true;
+                    submitSettingsBtn.textContent = 'Applied ✓';
+                    closeSidebar();
+                } else {
+                    showAlert('Failed to update settings: ' + data.error, 'error');
+                }
+            } catch (error) {
+                console.error('Settings update error:', error);
+                showAlert('Error updating settings', 'error');
+            }
+        }
+
+        // File upload functions (reused from PII page)
+        function handleDragOver(e) {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        }
+
+        function handleDragLeave(e) {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        }
+
+        function handleFileSelect(e) {
+            const files = e.target.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        }
+
+        function handleFile(file) {
+            currentFile = file;
+            
+            fileName.textContent = file.name;
+            fileSize.textContent = formatFileSize(file.size);
+            fileType.textContent = file.type || 'Unknown';
+            fileInfo.style.display = 'block';
+            
+            piiSelection.style.display = 'block';
+            document.querySelector('.card').classList.add('expanded');
+            
+            updateProcessButton();
+            uploadFile(file);
+        }
+
+        async function uploadFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    showAlert('File uploaded successfully!', 'success');
+                } else {
+                    showAlert('Upload failed: ' + data.error, 'error');
+                }
+            } catch (error) {
+                console.error('Upload error:', error);
+                showAlert('Error uploading file', 'error');
+            }
+        }
+
+        // PII Detection functions (reused from PII page)
+        async function loadPIICategories() {
+            try {
+                const response = await fetch('/get_pii_categories');
+                const data = await response.json();
+                
+                if (data.success) {
+                    piiCategoriesData = data.categories;
+                    renderPIICategories();
+                }
+            } catch (error) {
+                console.error('Error loading PII categories:', error);
+            }
+        }
+
+        function renderPIICategories() {
+            piiCategories.innerHTML = '';
+            
+            Object.keys(piiCategoriesData).forEach(categoryName => {
+                const category = piiCategoriesData[categoryName];
+                const categoryDiv = document.createElement('div');
+                categoryDiv.className = 'pii-category';
+                
+                let categoryHTML = `<div class="category-title">${categoryName}</div>`;
+                
+                Object.keys(category).forEach(entityKey => {
+                    const entityName = category[entityKey];
+                    categoryHTML += `
+                        <div class="pii-entity">
+                            <input type="checkbox" id="entity-${entityKey}" value="${entityKey}" onchange="updateProcessButton()">
+                            <label for="entity-${entityKey}">${entityName}</label>
+                        </div>
+                    `;
+                });
+                
+                categoryDiv.innerHTML = categoryHTML;
+                piiCategories.appendChild(categoryDiv);
+            });
+        }
+
+        function selectAllEntities() {
+            const checkboxes = piiCategories.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(cb => cb.checked = true);
+            updateProcessButton();
+        }
+
+        function selectNoneEntities() {
+            const checkboxes = piiCategories.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(cb => cb.checked = false);
+            updateProcessButton();
+        }
+
+        function updateProcessButton() {
+            const checkboxes = piiCategories.querySelectorAll('input[type="checkbox"]:checked');
+            const customEntities = customEntitiesInput.value.trim();
+            
+            processBtn.disabled = !(checkboxes.length > 0 || customEntities);
+        }
+
+        function getSelectedEntities() {
+            const checkboxes = piiCategories.querySelectorAll('input[type="checkbox"]:checked');
+            return Array.from(checkboxes).map(cb => cb.value);
+        }
+
+        // Agent processing functions
+        function updateAgentStatus(agent, status, isActive = false, isComplete = false, isError = false) {
+            const statusElement = agent === 1 ? agent1Status : agent2Status;
+            const indicatorElement = agent === 1 ? agent1Indicator : agent2Indicator;
+            const stepElement = agent === 1 ? agent1Step : agent2Step;
+            
+            statusElement.textContent = status;
+            
+            // Update indicator
+            indicatorElement.className = 'agent-status-indicator';
+            stepElement.classList.remove('active', 'completed', 'error');
+            
+            if (isError) {
+                indicatorElement.classList.add('error');
+                stepElement.classList.add('error');
+            } else if (isComplete) {
+                indicatorElement.classList.add('completed');
+                stepElement.classList.add('completed');
+            } else if (isActive) {
+                indicatorElement.classList.add('processing');
+                stepElement.classList.add('active');
+            }
+        }
+
+        async function processAgentic() {
+            if (!currentFile) {
+                showAlert('Please select a file first', 'error');
+                return;
+            }
+
+            const selectedEntities = getSelectedEntities();
+            const customEntities = customEntitiesInput.value.trim();
+
+            if (selectedEntities.length === 0 && !customEntities) {
+                showAlert('Please select at least one PII entity type', 'error');
+                return;
+            }
+
+            processingStartTime = Date.now();
+            
+            // Show processing pipeline
+            processing.style.display = 'block';
+            processBtn.disabled = true;
+            resultSection.style.display = 'none';
+            hideAllResultSections();
+            
+            // Reset agent statuses
+            updateAgentStatus(1, 'Initializing...', false, false, false);
+            updateAgentStatus(2, 'Waiting...', false, false, false);
+
+            try {
+                // Start Agent 1: PII Detection
+                updateAgentStatus(1, 'Analyzing document for PII...', true, false, false);
+                
+                const agent1Response = await fetch('/agentic_process', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        step: 'pii_detection',
+                        selected_entities: selectedEntities,
+                        custom_entities: customEntities
+                    })
+                });
+
+                const agent1Data = await agent1Response.json();
+                
+                if (!agent1Data.success) {
+                    updateAgentStatus(1, 'Error: ' + agent1Data.error, false, false, true);
+                    showAlert('Agent 1 failed: ' + agent1Data.error, 'error');
+                    return;
+                }
+
+                // Agent 1 completed successfully
+                updateAgentStatus(1, `Found ${agent1Data.pii_count} PII entities`, false, true, false);
+                pipelineResults.agent1 = agent1Data;
+                
+                // Start Agent 2: Classification and Extraction
+                updateAgentStatus(2, 'Classifying document...', true, false, false);
+                
+                const agent2Response = await fetch('/agentic_process', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        step: 'classification_extraction'
+                    })
+                });
+
+                const agent2Data = await agent2Response.json();
+                
+                if (!agent2Data.success) {
+                    updateAgentStatus(2, 'Error: ' + agent2Data.error, false, false, true);
+                    showAlert('Agent 2 failed: ' + agent2Data.error, 'error');
+                    return;
+                }
+
+                // Agent 2 completed successfully
+                updateAgentStatus(2, `Classified as ${agent2Data.document_type}`, false, true, false);
+                pipelineResults.agent2 = agent2Data;
+                
+                // Both agents completed - show results
+                displayPipelineResults();
+                
+            } catch (error) {
+                console.error('Agentic processing error:', error);
+                showAlert('Pipeline processing failed', 'error');
+                updateAgentStatus(1, 'Pipeline failed', false, false, true);
+                updateAgentStatus(2, 'Pipeline failed', false, false, true);
+            } finally {
+                processBtn.disabled = false;
+            }
+        }
+
+        function displayPipelineResults() {
+            const agent1Data = pipelineResults.agent1;
+            const agent2Data = pipelineResults.agent2;
+            
+            // Update result cards
+            detectedFileType.textContent = `File Type: ${agent1Data.file_type}`;
+            piiCount.textContent = `PII Entities Found: ${agent1Data.pii_count}`;
+            docClassification.textContent = `Document Type: ${agent2Data.document_type}`;
+            extractionStatus.textContent = `Data Extraction: Completed`;
+            
+            // Show result section
+            resultSection.style.display = 'block';
+            clearBtn.style.display = 'inline-block';
+            
+            showAlert(`Pipeline completed! Found ${agent1Data.pii_count} PII entities and classified document as ${agent2Data.document_type}`, 'success');
+        }
+
+        function showResultsSection(section) {
+            // Hide all result sections first
+            hideAllResultSections();
+            
+            // Show the requested section
+            if (section === 'pii') {
+                loadPiiResults();
+            } else if (section === 'extraction') {
+                loadExtractionResults();
+            } else if (section === 'summary') {
+                loadPipelineSummary();
+            }
+        }
+
+        function hideAllResultSections() {
+            piiResultsSection.style.display = 'none';
+            extractionResultsSection.style.display = 'none';
+            pipelineSummarySection.style.display = 'none';
+        }
+
+        async function loadPiiResults() {
+            piiResultsSection.style.display = 'block';
+            
+            const originalDisplay = document.getElementById('original-display');
+            const redactedDisplay = document.getElementById('redacted-display');
+            
+            originalDisplay.innerHTML = '<div class="content-loading"><div class="spinner"></div><p>Loading content...</p></div>';
+            redactedDisplay.innerHTML = '<div class="content-loading"><div class="spinner"></div><p>Loading redacted content...</p></div>';
+
+            try {
+                const response = await fetch('/get_agentic_results', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ result_type: 'pii' })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayPiiResults(data);
+                } else {
+                    showAlert('Failed to load PII results: ' + data.error, 'error');
+                }
+            } catch (error) {
+                console.error('PII results loading error:', error);
+                showAlert('Error loading PII results', 'error');
+            }
+        }
+
+        function displayPiiResults(data) {
+            const originalDisplay = document.getElementById('original-display');
+            const redactedDisplay = document.getElementById('redacted-display');
+            const fileType = data.file_type.toLowerCase();
+            
+            if (fileType === 'image') {
+                originalDisplay.innerHTML = `<img src="${data.original_image}" alt="Original Image">`;
+                redactedDisplay.innerHTML = `<img src="${data.redacted_image_url}" alt="Redacted Image">`;
+            } else if (fileType === 'audio' || fileType === 'video') {
+                const originalText = `<pre>${data.original_text}</pre>`;
+                const redactedText = `<pre>${data.redacted_text}</pre>`;
+                
+                if (data.audio_data && fileType === 'audio') {
+                    originalDisplay.innerHTML = `
+                        <audio controls style="width: 100%; margin-bottom: 1rem;">
+                            <source src="${data.audio_data}" type="audio/mpeg">
+                            Your browser does not support the audio element.
+                        </audio>
+                        <div style="margin-top: 1rem;">
+                            <h4>Transcription:</h4>
+                            ${originalText}
+                        </div>
+                    `;
+                } else {
+                    originalDisplay.innerHTML = originalText;
+                }
+                
+                redactedDisplay.innerHTML = redactedText;
+            } else {
+                originalDisplay.innerHTML = `<pre>${data.original_text}</pre>`;
+                redactedDisplay.innerHTML = `<pre>${data.redacted_text}</pre>`;
+            }
+        }
+
+        async function loadExtractionResults() {
+            extractionResultsSection.style.display = 'block';
+            
+            const classificationDisplay = document.getElementById('classification-display');
+            const extractionDisplay = document.getElementById('extraction-display');
+            
+            classificationDisplay.innerHTML = '<div class="content-loading"><div class="spinner"></div><p>Loading classification...</p></div>';
+            extractionDisplay.innerHTML = '<div class="content-loading"><div class="spinner"></div><p>Loading extracted data...</p></div>';
+
+            try {
+                const response = await fetch('/get_agentic_results', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ result_type: 'extraction' })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayExtractionResults(data);
+                } else {
+                    showAlert('Failed to load extraction results: ' + data.error, 'error');
+                }
+            } catch (error) {
+                console.error('Extraction results loading error:', error);
+                showAlert('Error loading extraction results', 'error');
+            }
+        }
+
+        function displayExtractionResults(data) {
+            const classificationDisplay = document.getElementById('classification-display');
+            const extractionDisplay = document.getElementById('extraction-display');
+            
+            // Display classification
+            classificationDisplay.innerHTML = `
+                <div class="classification-result">
+                    <div class="doc-type-badge">${data.document_type}</div>
+                    <p>Confidence: ${data.confidence}</p>
+                </div>
+            `;
+            
+            // Display extracted details
+            if (data.details && Object.keys(data.details).length > 0) {
+                let detailsHTML = '<div class="extracted-details">';
+                Object.entries(data.details).forEach(([key, value]) => {
+                    detailsHTML += `
+                        <div class="detail-item">
+                            <strong>${key}:</strong> ${value}
+                        </div>
+                    `;
+                });
+                detailsHTML += '</div>';
+                extractionDisplay.innerHTML = detailsHTML;
+            } else {
+                extractionDisplay.innerHTML = '<p>No specific details extracted from this document type.</p>';
+            }
+        }
+
+        async function loadPipelineSummary() {
+            pipelineSummarySection.style.display = 'block';
+            
+            // Calculate processing time
+            const processingTime = processingStartTime ? ((Date.now() - processingStartTime) / 1000).toFixed(1) : '--';
+            
+            // Update summary stats
+            document.getElementById('total-processing-time').textContent = processingTime + 's';
+            document.getElementById('total-pii-found').textContent = pipelineResults.agent1?.pii_count || '--';
+            document.getElementById('final-doc-type').textContent = pipelineResults.agent2?.document_type || '--';
+            
+            // Update timeline summaries
+            if (pipelineResults.agent1) {
+                document.getElementById('upload-summary').textContent = `${currentFile.name} (${formatFileSize(currentFile.size)})`;
+                document.getElementById('pii-summary').textContent = `Found ${pipelineResults.agent1.pii_count} PII entities in ${pipelineResults.agent1.file_type.toLowerCase()} file`;
+            }
+            
+            if (pipelineResults.agent2) {
+                document.getElementById('classification-summary').textContent = `Classified as ${pipelineResults.agent2.document_type} with ${pipelineResults.agent2.confidence.toLowerCase()} confidence`;
+            }
+            
+            document.getElementById('completion-summary').textContent = `Pipeline completed in ${processingTime} seconds`;
+        }
+
+        async function clearSession() {
+            try {
+                const response = await fetch('/clear', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    resetUI();
+                    showAlert('Session cleared successfully', 'success');
+                } else {
+                    showAlert('Failed to clear session: ' + data.error, 'error');
+                }
+            } catch (error) {
+                console.error('Clear session error:', error);
+                showAlert('Error clearing session', 'error');
+            }
+        }
+
+        function resetUI() {
+            fileInput.value = '';
+            currentFile = null;
+            pipelineResults = {};
+            processingStartTime = null;
+            
+            fileInfo.style.display = 'none';
+            piiSelection.style.display = 'none';
+            processing.style.display = 'none';
+            resultSection.style.display = 'none';
+            clearBtn.style.display = 'none';
+            
+            hideAllResultSections();
+            
+            processBtn.disabled = true;
+            
+            selectNoneEntities();
+            customEntitiesInput.value = '';
+            document.querySelector('.card').classList.remove('expanded');
+            
+            // Reset agent indicators
+            updateAgentStatus(1, 'Waiting...', false, false, false);
+            updateAgentStatus(2, 'Waiting...', false, false, false);
+            
+            alertContainer.innerHTML = '';
+        }
+
+        // Utility functions
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function showAlert(message, type = 'error') {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type}`;
+            alertDiv.textContent = message;
+            
+            alertContainer.innerHTML = '';
+            alertContainer.appendChild(alertDiv);
+            
+            if (type === 'success') {
+                setTimeout(() => {
+                    alertDiv.remove();
+                }, 5000);
+            }
+        }
+
+        // Initialize the application when DOM is loaded
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

@@ -714,6 +714,18 @@
                 <span class="learn-more">Click to proceed →</span>
             </div>
         </div>
+
+        <div class="navigation-card" onclick="navigateTo('agentic.html')">
+            <div class="card-icon">🤖</div>
+            <h2>Agentic AI Processing</h2>
+            <p>
+                Run a multi-agent pipeline: first, PII detection and redaction; then, classification and extraction on the redacted result. 
+                Experience advanced, compositional document intelligence.
+            </p>
+            <div class="card-footer">
+                <span class="learn-more">Click to proceed →</span>
+            </div>
+        </div>
     </div>
 </div>
 </body>
@@ -775,12 +787,13 @@
         });
     });
     function navigateTo(page) {
-        // Add a small delay for better UX
         setTimeout(() => {
             if (page === 'pii.html') {
                 window.location.href = '/pii';
             } else if (page === 'classification.html') {
                 window.location.href = '/classification';
+            } else if (page === 'agentic.html') {
+                window.location.href = '/agentic';
             }
         }, 200);
     }

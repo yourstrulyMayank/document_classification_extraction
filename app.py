@@ -1056,31 +1056,31 @@ def extract_contents():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/clear', methods=['POST'])
-def clear_session():
-    try:
-        # Clean up uploaded file
-        if 'current_file' in session:
-            file_path = session['current_file']['path']
-            if os.path.exists(file_path):
-                os.remove(file_path)
+# @app.route('/clear', methods=['POST'])
+# def clear_session():
+#     try:
+#         # Clean up uploaded file
+#         if 'current_file' in session:
+#             file_path = session['current_file']['path']
+#             if os.path.exists(file_path):
+#                 os.remove(file_path)
         
-        # Clean up temporary files
-        if 'temp_files' in session:
-            for temp_file in session['temp_files']:
-                if os.path.exists(temp_file):
-                    try:
-                        os.remove(temp_file)
-                    except:
-                        pass
+#         # Clean up temporary files
+#         if 'temp_files' in session:
+#             for temp_file in session['temp_files']:
+#                 if os.path.exists(temp_file):
+#                     try:
+#                         os.remove(temp_file)
+#                     except:
+#                         pass
         
-        # Clear session
-        session.clear()
+#         # Clear session
+#         session.clear()
         
-        return jsonify({'success': True, 'message': 'Session cleared'})
+#         return jsonify({'success': True, 'message': 'Session cleared'})
         
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+#     except Exception as e:
+#         return jsonify({'error': str(e)}), 500
 
 
 @app.route('/')
@@ -1560,5 +1560,344 @@ def get_pii_categories():
 
 ALLOWED_EXTENSIONS.update({'mp3', 'wav', 'flac', 'm4a', 'aac', 'ogg', 'mp4', 'avi', 'mov', 'mkv', 'wmv', 'txt', 'rtf', 'doc', 'docx'})
 
+
+
+# Add these routes to your existing Flask app after the existing routes
+
+# Agentic AI page route
+@app.route('/agentic')
+def agentic_processing():
+    return render_template('agentic.html')
+
+@app.route('/agentic_process', methods=['POST'])
+def agentic_process():
+    """
+    Multi-agent processing pipeline:
+    Step 1: PII Detection and Redaction (Agent 1)
+    Step 2: Document Classification and Extraction on redacted content (Agent 2)
+    """
+    try:
+        if 'current_file' not in session:
+            return jsonify({'error': 'No file to process'}), 400
+
+        data = request.get_json()
+        step = data.get('step')
+        
+        if step == 'pii_detection':
+            # Agent 1: PII Detection and Redaction
+            return process_agent_1(data)
+        elif step == 'classification_extraction':
+            # Agent 2: Document Classification and Extraction
+            return process_agent_2()
+        else:
+            return jsonify({'error': 'Invalid processing step'}), 400
+            
+    except Exception as e:
+        print(f"Agentic process error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Processing failed: {str(e)}'}), 500
+
+def process_agent_1(data):
+    """Agent 1: PII Detection and Redaction"""
+    try:
+        file_info = session['current_file']
+        file_path = file_info['path']
+        
+        selected_entities = data.get('selected_entities', [])
+        custom_entities = data.get('custom_entities', '')
+        
+        if not selected_entities and not custom_entities:
+            return jsonify({'error': 'Please select at least one PII entity type to detect'}), 400
+        
+        if not os.path.exists(file_path):
+            return jsonify({'error': 'File not found'}), 400
+        
+        # Detect file type
+        file_type = detect_file_type(file_path)
+        print(f"Agent 1 processing {file_type} file: {file_path}")
+        
+        # Prepare labels for PII detection
+        labels = selected_entities + [e.strip() for e in custom_entities.split(',') if e.strip()]
+        
+        extracted_text = ""
+        redacted_text = ""
+        redacted_image_path = None
+        redacted_image_filename = None
+        
+        if file_type == 'image':
+            # Use common_functions for image processing
+            import cv2
+            img = cv2.imread(file_path)
+            if img is None:
+                return jsonify({'error': 'Could not read image file'}), 400
+                
+            detections = reader.readtext(file_path)
+            processed_detections = [(d[0], d[1], d[2]) for d in detections]
+            
+            # Get full text for PII identification
+            full_text = " ".join([d[1] for d in processed_detections])
+            extracted_text = full_text
+            
+            # Identify and redact PII
+            pii_entities = identify_pii(full_text, labels, gliner_model, llm_model, spacy_model)
+            draw_black_rectangles(img, processed_detections, labels, gliner_model, llm_model, spacy_model)
+            
+            # Save redacted image
+            import uuid
+            redacted_filename = f"redacted_{uuid.uuid4().hex[:8]}.png"
+            redacted_image_path = os.path.join(app.config['UPLOAD_FOLDER'], redacted_filename)
+            cv2.imwrite(redacted_image_path, img)
+            redacted_image_filename = redacted_filename
+            
+            # Store in session for cleanup
+            if 'temp_files' not in session:
+                session['temp_files'] = []
+            session['temp_files'].append(redacted_image_path)
+            
+            # Create redacted text (not used for images, but stored for consistency)
+            redacted_text = redact_pii(full_text, labels, gliner_model, llm_model, spacy_model)
+            
+        elif file_type == 'text':
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                extracted_text = f.read()
+                
+            pii_entities = identify_pii(extracted_text, labels, gliner_model, llm_model, spacy_model)
+            redacted_text = redact_pii(extracted_text, labels, gliner_model, llm_model, spacy_model)
+            
+        elif file_type == 'pdf':
+            extracted_text = extract_text_from_pdf(file_path)
+            if not extracted_text:
+                return jsonify({'error': 'Could not extract text from PDF'}), 400
+                
+            pii_entities = identify_pii(extracted_text, labels, gliner_model, llm_model, spacy_model)
+            redacted_text = redact_pii(extracted_text, labels, gliner_model, llm_model, spacy_model)
+            
+        elif file_type == 'audio':
+            extracted_text = transcribe_audio(file_path)
+            if not extracted_text:
+                return jsonify({'error': 'Could not transcribe audio file'}), 400
+                
+            pii_entities = identify_pii(extracted_text, labels, gliner_model, llm_model, spacy_model)
+            redacted_text = redact_pii(extracted_text, labels, gliner_model, llm_model, spacy_model)
+            
+        else:
+            return jsonify({'error': f'Unsupported file type: {file_type}'}), 400
+        
+        # Store Agent 1 results in session
+        session['agent1_results'] = {
+            'file_type': file_type,
+            'extracted_text': extracted_text,
+            'redacted_text': redacted_text,
+            'redacted_image_path': redacted_image_path,
+            'redacted_image_filename': redacted_image_filename,
+            'pii_entities': [{'text': ent[0], 'type': ent[1], 'redaction': f'<{ent[1]}>'} for ent in pii_entities],
+            'selected_entities': selected_entities,
+            'custom_entities': custom_entities,
+            'processed_at': datetime.now().isoformat()
+        }
+        
+        pii_count = len(pii_entities)
+        return jsonify({
+            'success': True,
+            'file_type': file_type.title(),
+            'pii_count': pii_count,
+            'pii_found': pii_count > 0,
+            'agent': 1
+        })
+        
+    except Exception as e:
+        print(f"Agent 1 error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Agent 1 failed: {str(e)}'}), 500
+
+def process_agent_2():
+    """Agent 2: Document Classification and Extraction on redacted content"""
+    try:
+        if 'agent1_results' not in session:
+            return jsonify({'error': 'Agent 1 results not found. Please run PII detection first.'}), 400
+        
+        agent1_results = session['agent1_results']
+        
+        # Use redacted text for classification and extraction
+        redacted_text = agent1_results['redacted_text']
+        
+        if not redacted_text or len(redacted_text.strip()) < 10:
+            return jsonify({'error': 'Insufficient redacted text for classification'}), 400
+        
+        print(f"Agent 2: Classifying redacted text (length: {len(redacted_text)})")
+        
+        # Classify document using redacted text
+        doc_type = classify_document(redacted_text)
+        print(f"Agent 2: Classified as {doc_type}")
+        
+        # Extract details from redacted text
+        extracted_details = extract_details(redacted_text, doc_type)
+        print(f"Agent 2: Extracted details: {extracted_details}")
+        
+        # Store Agent 2 results in session
+        session['agent2_results'] = {
+            'document_type': doc_type,
+            'extracted_details': extracted_details,
+            'confidence': 'High' if doc_type != 'unknown' else 'Low',
+            'processed_at': datetime.now().isoformat(),
+            'processed_text_length': len(redacted_text)
+        }
+        
+        doc_type_display = doc_type.replace('_', ' ').title()
+        return jsonify({
+            'success': True,
+            'document_type': doc_type_display,
+            'confidence': 'High' if doc_type != 'unknown' else 'Low',
+            'details_count': len(extracted_details) if extracted_details else 0,
+            'agent': 2
+        })
+        
+    except Exception as e:
+        print(f"Agent 2 error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Agent 2 failed: {str(e)}'}), 500
+
+@app.route('/get_agentic_results', methods=['POST'])
+def get_agentic_results():
+    """Get results from the agentic pipeline"""
+    try:
+        data = request.get_json()
+        result_type = data.get('result_type')
+        
+        if result_type == 'pii':
+            return get_agent_1_results()
+        elif result_type == 'extraction':
+            return get_agent_2_results()
+        else:
+            return jsonify({'error': 'Invalid result type'}), 400
+            
+    except Exception as e:
+        print(f"Get agentic results error: {str(e)}")
+        return jsonify({'error': f'Failed to get results: {str(e)}'}), 500
+
+def get_agent_1_results():
+    """Get Agent 1 (PII) results for display"""
+    try:
+        if 'agent1_results' not in session:
+            return jsonify({'error': 'Agent 1 results not found'}), 400
+            
+        if 'current_file' not in session:
+            return jsonify({'error': 'No file found'}), 400
+        
+        results = session['agent1_results']
+        file_info = session['current_file']
+        file_path = file_info['path']
+        
+        file_type = results['file_type']
+        extracted_text = results['extracted_text']
+        pii_entities = results['pii_entities']
+        
+        response_data = {
+            'success': True,
+            'file_type': file_type,
+            'pii_entities': pii_entities,
+            'original_text': extracted_text
+        }
+        
+        if file_type == 'image':
+            # Use the saved redacted image
+            redacted_filename = results.get('redacted_image_filename')
+            if redacted_filename:
+                # Convert original image to base64
+                with open(file_path, 'rb') as f:
+                    original_image_b64 = base64.b64encode(f.read()).decode()
+                
+                response_data.update({
+                    'original_image': f"data:image/jpeg;base64,{original_image_b64}",
+                    'redacted_image_url': f"/get_redacted_image/{redacted_filename}",
+                    'redaction_areas': []
+                })
+            else:
+                return jsonify({'error': 'Redacted image not found'}), 500
+                
+        else:
+            # For text-based content
+            redacted_text = results.get('redacted_text', extracted_text)
+            response_data['redacted_text'] = redacted_text
+            
+            # For audio/video, provide file data
+            if file_type in ['audio', 'video']:
+                try:
+                    with open(file_path, 'rb') as f:
+                        audio_b64 = base64.b64encode(f.read()).decode()
+                    response_data['audio_data'] = f"data:audio/mpeg;base64,{audio_b64}"
+                except:
+                    response_data['audio_data'] = None
+        
+        return jsonify(response_data)
+        
+    except Exception as e:
+        print(f"Get Agent 1 results error: {str(e)}")
+        return jsonify({'error': f'Failed to get Agent 1 results: {str(e)}'}), 500
+
+def get_agent_2_results():
+    """Get Agent 2 (Classification/Extraction) results for display"""
+    try:
+        if 'agent2_results' not in session:
+            return jsonify({'error': 'Agent 2 results not found'}), 400
+        
+        results = session['agent2_results']
+        
+        return jsonify({
+            'success': True,
+            'document_type': results['document_type'].replace('_', ' ').title(),
+            'confidence': results['confidence'],
+            'details': results['extracted_details']
+        })
+        
+    except Exception as e:
+        print(f"Get Agent 2 results error: {str(e)}")
+        return jsonify({'error': f'Failed to get Agent 2 results: {str(e)}'}), 500
+
+# Update the clear route to handle agentic session data
+def clear_session_extended():
+    """Extended clear session function for agentic processing"""
+    try:
+        # Clean up uploaded file
+        if 'current_file' in session:
+            file_path = session['current_file']['path']
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        
+        # Clean up temporary files (including redacted images)
+        if 'temp_files' in session:
+            for temp_file in session['temp_files']:
+                if os.path.exists(temp_file):
+                    try:
+                        os.remove(temp_file)
+                    except:
+                        pass
+        
+        # Clean up agent-specific temporary files
+        if 'agent1_results' in session:
+            agent1_results = session['agent1_results']
+            if agent1_results.get('redacted_image_path'):
+                redacted_path = agent1_results['redacted_image_path']
+                if os.path.exists(redacted_path):
+                    try:
+                        os.remove(redacted_path)
+                    except:
+                        pass
+        
+        # Clear all session data
+        session.clear()
+        
+        return jsonify({'success': True, 'message': 'Session cleared'})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Replace the existing clear route or update it to use the extended version
+@app.route('/clear', methods=['POST'])
+def clear_session():
+    return clear_session_extended()
 if __name__ == "__main__":
     app.run(debug=True)
