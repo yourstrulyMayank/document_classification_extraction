@@ -4,7 +4,8 @@
 
 # --- LLM Provider Settings ---
 MODEL_PROVIDER = "api"  # options: "huggingface", "ollama", "api"
-MODEL_NAME = "google/gemma-3-1b-it"  # e.g., "gemma-7b-it", "llama3:8b", "mistral-7b-instruct" #Not required if provider is api
+# MODEL_NAME = "google/gemma-3-1b-it"  # e.g., "gemma-7b-it", "llama3:8b", "mistral-7b-instruct" #Not required if provider is api
+# MODEL_NAME = "llama3.2"  # e.g., "gemma-7b-it", "llama3:8b", "mistral-7b-instruct" #Not required if provider is api
 HF_LOCAL_PATH = r"/models/llm/gemma-3-1b-it"  # used if MODEL_PROVIDER = "huggingface"
 
 # --- OCR Settings ---
@@ -1561,42 +1562,15 @@ def get_pii_categories():
 ALLOWED_EXTENSIONS.update({'mp3', 'wav', 'flac', 'm4a', 'aac', 'ogg', 'mp4', 'avi', 'mov', 'mkv', 'wmv', 'txt', 'rtf', 'doc', 'docx'})
 
 
+############
+# Agentic AI
 
-# Add these routes to your existing Flask app after the existing routes
 
 # Agentic AI page route
 @app.route('/agentic')
 def agentic_processing():
     return render_template('agentic.html')
 
-@app.route('/agentic_process', methods=['POST'])
-def agentic_process():
-    """
-    Multi-agent processing pipeline:
-    Step 1: PII Detection and Redaction (Agent 1)
-    Step 2: Document Classification and Extraction on redacted content (Agent 2)
-    """
-    try:
-        if 'current_file' not in session:
-            return jsonify({'error': 'No file to process'}), 400
-
-        data = request.get_json()
-        step = data.get('step')
-        
-        if step == 'pii_detection':
-            # Agent 1: PII Detection and Redaction
-            return process_agent_1(data)
-        elif step == 'classification_extraction':
-            # Agent 2: Document Classification and Extraction
-            return process_agent_2()
-        else:
-            return jsonify({'error': 'Invalid processing step'}), 400
-            
-    except Exception as e:
-        print(f"Agentic process error: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': f'Processing failed: {str(e)}'}), 500
 
 def process_agent_1(data):
     """Agent 1: PII Detection and Redaction"""
@@ -1856,6 +1830,188 @@ def get_agent_2_results():
     except Exception as e:
         print(f"Get Agent 2 results error: {str(e)}")
         return jsonify({'error': f'Failed to get Agent 2 results: {str(e)}'}), 500
+
+
+##Way 1
+
+# @app.route('/agentic_process', methods=['POST'])
+# def agentic_process():
+#     """
+#     Multi-agent processing pipeline:
+#     Step 1: PII Detection and Redaction (Agent 1)
+#     Step 2: Document Classification and Extraction on redacted content (Agent 2)
+#     """
+#     try:
+#         if 'current_file' not in session:
+#             return jsonify({'error': 'No file to process'}), 400
+
+#         data = request.get_json()
+#         step = data.get('step')
+        
+#         if step == 'pii_detection':
+#             # Agent 1: PII Detection and Redaction
+#             return process_agent_1(data)
+#         elif step == 'classification_extraction':
+#             # Agent 2: Document Classification and Extraction
+#             return process_agent_2()
+#         else:
+#             return jsonify({'error': 'Invalid processing step'}), 400
+            
+#     except Exception as e:
+#         print(f"Agentic process error: {str(e)}")
+#         import traceback
+#         traceback.print_exc()
+#         return jsonify({'error': f'Processing failed: {str(e)}'}), 500
+
+
+#####################
+
+##Way 2
+class BaseAgent:
+    def __init__(self, name):
+        self.name = name
+
+    def run(self, input_data):
+        raise NotImplementedError("Agent must implement run()")
+
+
+class PIIAgent(BaseAgent):
+    def run(self, input_data):
+        # Call your existing process_agent_1 logic
+        return process_agent_1(input_data)
+
+
+class ClassificationExtractionAgent(BaseAgent):
+    def run(self, input_data=None):
+        # Call your existing process_agent_2 logic
+        return process_agent_2()
+
+
+class Orchestrator:
+    def __init__(self, agents):
+        self.agents = {agent.name: agent for agent in agents}
+
+    def run_pipeline(self, steps, data=None):
+        results = {}
+        for step in steps:
+            agent = self.agents.get(step)
+            if not agent:
+                raise ValueError(f"Agent {step} not found in pipeline")
+            print(f"Running {step}...")
+            output = agent.run(data)
+            results[step] = output
+            # Pass forward the latest result if needed
+            data = output  
+        return results
+    
+
+
+@app.route('/agentic_process', methods=['POST'])
+def agentic_process():
+    try:
+        if 'current_file' not in session:
+            return jsonify({'error': 'No file to process'}), 400
+
+        data = request.get_json()
+        step = data.get('step')
+
+        # Register agents once
+        pii_agent = PIIAgent("pii_detection")
+        classify_agent = ClassificationExtractionAgent("classification_extraction")
+        orchestrator = Orchestrator([pii_agent, classify_agent])
+
+        if step in ["pii_detection", "classification_extraction"]:
+            results = orchestrator.run_pipeline([step], data)
+            return results[step]  # return only requested step
+        elif step == "full_pipeline":
+            # Run both sequentially
+            results = orchestrator.run_pipeline(["pii_detection", "classification_extraction"], data)
+            return jsonify(results)
+        else:
+            return jsonify({'error': 'Invalid processing step'}), 400
+
+    except Exception as e:
+        print(f"Agentic process error: {str(e)}")
+        import traceback; traceback.print_exc()
+        return jsonify({'error': f'Processing failed: {str(e)}'}), 500
+
+
+#####################
+
+#Way 3
+# from langchain.agents import initialize_agent, Tool
+# from langchain.llms import Ollama
+# from langchain.tools import StructuredTool
+# from pydantic import BaseModel
+
+# class PIIInput(BaseModel):
+#     selected_entities: list[str] = []
+#     custom_entities: str = ""
+
+# def pii_structured_tool(data: PIIInput):
+#     return process_agent_1(data.dict())
+
+# # Wrap your existing functions as Tools
+# pii_tool = StructuredTool.from_function(
+#     func=pii_structured_tool,
+#     name="PII_Detector",
+#     description="Detects and redacts PII from documents. "
+#                 "Input must include selected_entities (list of strings) and custom_entities (comma-separated)."
+# )
+
+# classification_tool = Tool(
+#     name="Document_Classifier",
+#     func=lambda _: process_agent_2(),
+#     description="Classifies document type and extracts details from redacted text."
+# )
+
+# # Initialize LLM + Agent
+# llm = Ollama(model="llama3.2")
+# agent = initialize_agent(
+#     tools=[pii_tool, classification_tool],
+#     llm=llm,
+#     agent="zero-shot-react-description",
+#     verbose=True
+# )
+
+
+# @app.route('/agentic_process', methods=['POST'])
+# def agentic_process():
+#     try:
+#         if 'current_file' not in session:
+#             return jsonify({'error': 'No file to process'}), 400
+
+#         data = request.get_json()
+#         step = data.get('step')
+
+#         if step == 'pii_detection':
+#             response = agent.run("Run PII_Detector with given file")
+#             return response
+
+#         elif step == 'classification_extraction':
+#             response = agent.run("Run Document_Classifier on redacted content")
+#             return response
+
+#         elif step == 'full_pipeline':
+#             response = agent.run(
+#                 "First run PII_Detector on the current file, "
+#                 "then run Document_Classifier on the redacted content"
+#             )
+#             return response
+
+#         else:
+#             return jsonify({'error': 'Invalid processing step'}), 400
+
+#     except Exception as e:
+#         print(f"Agentic process error: {str(e)}")
+#         import traceback; traceback.print_exc()
+#         return jsonify({'error': f'Processing failed: {str(e)}'}), 500
+
+
+
+
+
+
 
 # Update the clear route to handle agentic session data
 def clear_session_extended():

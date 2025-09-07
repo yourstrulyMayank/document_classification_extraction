@@ -44,3 +44,4 @@ setuptools-rust
 gliner
 gliner
 easyocr
+langchain
