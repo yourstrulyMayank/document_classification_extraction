@@ -50,7 +50,7 @@ def get_spacy_model(model_name="en_core_web_sm"):
 
 print("Initializing models...")
 gliner_model = get_gliner_model()
-spacy_model = get_spacy_model()
+spacy_model = None#get_spacy_model()
 reader = easyocr.Reader(['en'], model_storage_directory="./models/easyocr/")
 # llm_model = Ollama(model="llama3.2")
 print("Models initialized successfully.")
@@ -129,8 +129,8 @@ def identify_pii(text, labels, gliner_model, llm_model, spacy_model):
     print("Running PII detection using SpaCy, GLiNER, and LLM...")
     definitions = load_definitions()
 
-    pii_entities_spacy = [(ent.text, ent.label_) for ent in spacy_model(text).ents if ent.label_ in labels]
-    print(f"SpaCy detected {len(pii_entities_spacy)} entities")
+    # pii_entities_spacy = [(ent.text, ent.label_) for ent in spacy_model(text).ents if ent.label_ in labels]
+    # print(f"SpaCy detected {len(pii_entities_spacy)} entities")
 
     gliner_entities = gliner_model.predict_entities(text, labels)
     pii_entities_gliner = [(entity["text"], entity["label"]) for entity in gliner_entities]
@@ -138,7 +138,8 @@ def identify_pii(text, labels, gliner_model, llm_model, spacy_model):
 
     pii_entities_llm = detect_pii_with_llm(text, labels, definitions, llm_model)
 
-    pii_entities = set(pii_entities_spacy + pii_entities_gliner + pii_entities_llm)
+    # pii_entities = set(pii_entities_spacy + pii_entities_gliner + pii_entities_llm)
+    pii_entities = set(pii_entities_gliner + pii_entities_llm)
     print(f"Total unique PII entities identified: {len(pii_entities)}")
     return pii_entities
 

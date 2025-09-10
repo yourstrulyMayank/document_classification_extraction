@@ -514,6 +514,76 @@
             gap: 2rem;
             margin-bottom: 2rem;
         }
+        .agent-reasoning {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+        }
+
+        .reasoning-log {
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 1rem 0;
+        }
+
+        .reasoning-step {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem;
+            margin: 0.5rem 0;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            border-left: 3px solid #4CAF50;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .reasoning-step.thinking {
+            border-left-color: #2196F3;
+        }
+
+        .reasoning-step.action {
+            border-left-color: #FF9800;
+        }
+
+        .reasoning-step.tool-start {
+            border-left-color: #9C27B0;
+        }
+
+        .reasoning-step.tool-end {
+            border-left-color: #4CAF50;
+        }
+
+        .reasoning-step.error {
+            border-left-color: #F44336;
+        }
+
+        .reasoning-step.completed {
+            border-left-color: #4CAF50;
+        }
+
+        .step-icon {
+            font-size: 1.2rem;
+            margin-right: 0.75rem;
+            flex-shrink: 0;
+        }
+
+        .step-text {
+            flex: 1;
+            color: #ffffff;
+            line-height: 1.4;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
 
         .original-panel, .redacted-panel {
             background: white;
@@ -564,6 +634,60 @@
             justify-content: center;
             height: 200px;
             color: #666;
+        }
+        .ai-prompt-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 32px auto 24px auto;
+            width: 100%;
+            max-width: 700px;
+            background: linear-gradient(90deg, #232526 0%, #414345 100%);
+            border-radius: 2rem;
+            box-shadow: 0 4px 32px rgba(75, 108, 183, 0.12);
+            padding: 0.5rem 1rem;
+            position: relative;
+        }
+
+        .ai-prompt-box {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #fff;
+            font-size: 1.25rem;
+            padding: 1rem 1.5rem;
+            border-radius: 2rem;
+            font-family: 'Segoe UI', 'Roboto', 'Arial', sans-serif;
+            letter-spacing: 0.03em;
+        }
+
+        .ai-prompt-box::placeholder {
+            color: #b0b8c1;
+            opacity: 1;
+            font-style: italic;
+        }
+
+        .ai-prompt-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            border: none;
+            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            font-size: 1.5rem;
+            margin-left: 0.5rem;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.18);
+            transition: background 0.2s, transform 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .ai-prompt-btn:hover {
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+            transform: scale(1.08);
         }
 
         .pii-summary {
@@ -736,7 +860,16 @@
             ✕
         </div>
     </div>
-
+    <div class="ai-prompt-container">
+        <input
+            type="text"
+            id="ai-prompt-input"
+            class="ai-prompt-box"
+            placeholder="What should I do for you today?"
+            autocomplete="off"
+        />
+        <button id="ai-prompt-submit" class="ai-prompt-btn">➤</button>
+    </div>
     <div class="main-content">
         <div class="card">
             <h2>Multi-Agent Document Processing Pipeline</h2>
@@ -777,7 +910,7 @@
                     </div>
                 </div>
                 
-                <button id="process-btn" class="btn" disabled>🤖 Start Agentic Processing</button>
+                
             </div>
 
             <!-- File Info -->
@@ -785,6 +918,18 @@
                 <strong>Selected File:</strong> <span id="file-name"></span><br>
                 <strong>Size:</strong> <span id="file-size"></span><br>
                 <strong>Type:</strong> <span id="file-type"></span>
+            </div>
+
+            <div id="processing" class="processing">
+                <div class="agent-reasoning">
+                    <h3>🧠 Agent Reasoning Process</h3>
+                    <div id="reasoning-log" class="reasoning-log">
+                        <div class="reasoning-step initial">
+                            <span class="step-icon">💭</span>
+                            <span class="step-text">Ready to process your request...</span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Processing Section with Agent Status -->
@@ -936,7 +1081,7 @@
         // Global variables
         const fileInput = document.getElementById('file-input');
         const uploadArea = document.getElementById('upload-area');
-        const processBtn = document.getElementById('process-btn');
+        //const processBtn = document.getElementById('process-btn');
         const showPiiResultsBtn = document.getElementById('show-pii-results-btn');
         const showExtractionResultsBtn = document.getElementById('show-extraction-results-btn');
         const showPipelineSummaryBtn = document.getElementById('show-pipeline-summary-btn');
@@ -959,12 +1104,13 @@
         const selectNoneBtn = document.getElementById('select-none-btn');
         
         // Agent status elements
-        const agent1Status = document.getElementById('agent1-status');
-        const agent2Status = document.getElementById('agent2-status');
-        const agent1Indicator = document.getElementById('agent1-indicator');
-        const agent2Indicator = document.getElementById('agent2-indicator');
-        const agent1Step = document.getElementById('agent1-step');
-        const agent2Step = document.getElementById('agent2-step');
+        //const agent1Status = document.getElementById('agent1-status');
+        //const agent2Status = document.getElementById('agent2-status');
+        //const agent1Indicator = document.getElementById('agent1-indicator');
+        //const agent2Indicator = document.getElementById('agent2-indicator');
+        //const agent1Step = document.getElementById('agent1-step');
+        //const agent2Step = document.getElementById('agent2-step');
+        const reasoningLog = document.getElementById('reasoning-log');
         
         // Result display elements
         const detectedFileType = document.getElementById('detected-file-type');
@@ -991,12 +1137,90 @@
         let piiCategoriesData = {};
         let pipelineResults = {};
         let processingStartTime = null;
-
+        let reasoningPollingInterval = null;
         // Initialize the application
         async function init() {
             setupEventListeners();
             await loadPIICategories();
             setDefaultSettings();
+        }
+        function startReasoningPolling() {
+            reasoningPollingInterval = setInterval(async () => {
+                try {
+                    const response = await fetch('/get_agent_steps');
+                    const data = await response.json();
+                    
+                    if (data.steps && data.steps.length > 0) {
+                        updateReasoningDisplay(data.steps);
+                    }
+                } catch (error) {
+                    console.error('Error polling reasoning steps:', error);
+                }
+            }, 1000); // Poll every second
+        }
+
+        function stopReasoningPolling() {
+            if (reasoningPollingInterval) {
+                clearInterval(reasoningPollingInterval);
+                reasoningPollingInterval = null;
+            }
+        }
+
+        function updateReasoningDisplay(steps) {
+            // Only add new steps that haven't been displayed yet
+            const currentSteps = reasoningLog.querySelectorAll('.reasoning-step').length;
+            const newSteps = steps.slice(currentSteps - 1); // -1 because we start with one initial step
+            
+            newSteps.forEach(step => {
+                let icon, text, className;
+                
+                switch(step.type) {
+                    case 'thinking':
+                        icon = '🤔';
+                        text = step.content || 'Thinking about the next steps...';
+                        className = 'thinking';
+                        break;
+                    case 'action':
+                        icon = step.tool === 'PII_Detector' ? '🛡️' : '📄';
+                        text = `Action: Using ${step.tool}`;
+                        className = 'action';
+                        break;
+                    case 'tool_start':
+                        icon = '🔧';
+                        text = step.content;
+                        className = 'tool-start';
+                        break;
+                    case 'tool_end':
+                        icon = '✅';
+                        text = step.content;
+                        className = 'tool-end';
+                        break;
+                    case 'finish':
+                        icon = '🎯';
+                        text = 'Task completed successfully';
+                        className = 'completed';
+                        break;
+                    default:
+                        icon = '💭';
+                        text = step.content || step.log || 'Processing...';
+                        className = 'default';
+                }
+                
+                addReasoningStep(icon, text, className);
+            });
+        }
+
+        function addReasoningStep(icon, text, className = '') {
+            const step = document.createElement('div');
+            step.className = `reasoning-step ${className}`;
+            step.innerHTML = `
+                <span class="step-icon">${icon}</span>
+                <span class="step-text">${text}</span>
+            `;
+            reasoningLog.appendChild(step);
+            
+            // Auto-scroll to latest step
+            step.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
 
         function setDefaultSettings() {
@@ -1046,6 +1270,10 @@
                 settingsChanged = true;
                 submitSettingsBtn.disabled = false;
             });
+            document.getElementById('ai-prompt-submit').addEventListener('click', submitAIPrompt);
+            document.getElementById('ai-prompt-input').addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') submitAIPrompt();
+            });
 
             submitSettingsBtn.addEventListener('click', updateSettings);
 
@@ -1056,7 +1284,7 @@
             uploadArea.addEventListener('drop', handleDrop);
 
             fileInput.addEventListener('change', handleFileSelect);
-            processBtn.addEventListener('click', processAgentic);
+            //processBtn.addEventListener('click', processAgentic);
             showPiiResultsBtn.addEventListener('click', () => showResultsSection('pii'));
             showExtractionResultsBtn.addEventListener('click', () => showResultsSection('extraction'));
             showPipelineSummaryBtn.addEventListener('click', () => showResultsSection('summary'));
@@ -1066,6 +1294,128 @@
             selectAllBtn.addEventListener('click', selectAllEntities);
             selectNoneBtn.addEventListener('click', selectNoneEntities);
             customEntitiesInput.addEventListener('input', updateProcessButton);
+        }
+        
+        async function submitAIPrompt() {
+            const prompt = document.getElementById('ai-prompt-input').value.trim();
+            if (!prompt) return;
+
+            // Check if file is uploaded and PII entities are selected
+            if (!currentFile) {
+                showAlert('Please upload a file first', 'error');
+                return;
+            }
+
+            const selectedEntities = getSelectedEntities();
+            const customEntities = customEntitiesInput.value.trim();
+
+            if (selectedEntities.length === 0 && !customEntities) {
+                showAlert('Please select at least one PII entity type', 'error');
+                return;
+            }
+
+            // Start the processing pipeline
+            processingStartTime = Date.now();
+            
+            // Show processing pipeline
+            processing.style.display = 'block';
+            resultSection.style.display = 'none';
+            hideAllResultSections();
+            
+            // Initialize reasoning log
+            reasoningLog.innerHTML = '<div class="reasoning-step thinking"><span class="step-icon">🤔</span><span class="step-text">Starting to analyze your request...</span></div>';
+
+            // Start polling for reasoning steps
+            startReasoningPolling();
+
+            showAlert('Processing your request...', 'success');
+
+            try {
+                const response = await fetch('/agentic_process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_prompt: prompt,
+                        selected_entities: selectedEntities,
+                        custom_entities: customEntities
+                    })
+                });
+                const data = await response.json();
+
+                // Stop polling
+                stopReasoningPolling();
+
+                if (data.success && data.result) {
+                    showAlert('Agentic pipeline completed! Result: ' + data.result, 'success');
+                    
+                    // Add final completion step
+                    addReasoningStep('✅', 'Pipeline completed successfully!', 'completed');
+                    
+                    // Show results section
+                    resultSection.style.display = 'block';
+                    clearBtn.style.display = 'inline-block';
+                    
+                    // Clear the prompt input
+                    document.getElementById('ai-prompt-input').value = '';
+                } else {
+                    showAlert('Agentic pipeline failed: ' + (data.error || 'Unknown error'), 'error');
+                    addReasoningStep('❌', 'Pipeline failed: ' + (data.error || 'Unknown error'), 'error');
+                }
+            } catch (error) {
+                stopReasoningPolling();
+                showAlert('Agentic pipeline error: ' + error.message, 'error');
+                addReasoningStep('❌', 'Pipeline error: ' + error.message, 'error');
+            }
+        }
+
+        // Create new function that combines processAgentic with prompt handling:
+        async function processAgenticWithPrompt(userPrompt, selectedEntities, customEntities) {
+            processingStartTime = Date.now();
+            
+            // Show processing pipeline
+            processing.style.display = 'block';
+            resultSection.style.display = 'none';
+            hideAllResultSections();
+            
+            // Reset agent statuses
+            updateAgentStatus(1, 'Initializing...', false, false, false);
+            updateAgentStatus(2, 'Waiting...', false, false, false);
+
+            showAlert('Processing your request with agentic pipeline...', 'success');
+
+            try {
+                const response = await fetch('/agentic_process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_prompt: userPrompt,
+                        selected_entities: selectedEntities,
+                        custom_entities: customEntities
+                    })
+                });
+                
+                const data = await response.json();
+
+                if (data.success && data.result) {
+                    showAlert('Agentic pipeline completed! Result: ' + data.result, 'success');
+                    // Keep existing UI update logic
+                    updateAgentStatus(1, 'PII Detection Complete', false, true, false);
+                    updateAgentStatus(2, 'Classification Complete', false, true, false);
+                    resultSection.style.display = 'block';
+                    clearBtn.style.display = 'inline-block';
+                } else {
+                    showAlert('Agentic pipeline failed: ' + (data.error || 'Unknown error'), 'error');
+                    updateAgentStatus(1, 'Pipeline failed', false, false, true);
+                    updateAgentStatus(2, 'Pipeline failed', false, false, true);
+                }
+            } catch (error) {
+                showAlert('Agentic pipeline error: ' + error.message, 'error');
+                updateAgentStatus(1, 'Pipeline failed', false, false, true);
+                updateAgentStatus(2, 'Pipeline failed', false, false, true);
+            }
+
+            // Clear the input
+            document.getElementById('ai-prompt-input').value = '';
         }
 
         // Sidebar functions (reused from PII page)
@@ -1242,7 +1592,7 @@
             const checkboxes = piiCategories.querySelectorAll('input[type="checkbox"]:checked');
             const customEntities = customEntitiesInput.value.trim();
             
-            processBtn.disabled = !(checkboxes.length > 0 || customEntities);
+            //processBtn.disabled = !(checkboxes.length > 0 || customEntities);
         }
 
         function getSelectedEntities() {
@@ -1539,6 +1889,8 @@
             document.getElementById('total-pii-found').textContent = pipelineResults.agent1?.pii_count || '--';
             document.getElementById('final-doc-type').textContent = pipelineResults.agent2?.document_type || '--';
             
+
+            
             // Update timeline summaries
             if (pipelineResults.agent1) {
                 document.getElementById('upload-summary').textContent = `${currentFile.name} (${formatFileSize(currentFile.size)})`;
@@ -1581,6 +1933,9 @@
             pipelineResults = {};
             processingStartTime = null;
             
+            // Stop any ongoing polling
+            stopReasoningPolling();
+            
             fileInfo.style.display = 'none';
             piiSelection.style.display = 'none';
             processing.style.display = 'none';
@@ -1589,15 +1944,12 @@
             
             hideAllResultSections();
             
-            processBtn.disabled = true;
-            
             selectNoneEntities();
             customEntitiesInput.value = '';
             document.querySelector('.card').classList.remove('expanded');
             
-            // Reset agent indicators
-            updateAgentStatus(1, 'Waiting...', false, false, false);
-            updateAgentStatus(2, 'Waiting...', false, false, false);
+            // Reset reasoning log
+            reasoningLog.innerHTML = '<div class="reasoning-step initial"><span class="step-icon">💭</span><span class="step-text">Ready to process your request...</span></div>';
             
             alertContainer.innerHTML = '';
         }
